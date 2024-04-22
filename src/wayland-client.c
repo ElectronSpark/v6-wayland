@@ -78,6 +78,8 @@ struct wl_event_queue {
 	struct wl_list proxy_list; /**< struct wl_proxy::queue_link */
 	struct wl_display *display;
 	char *name;
+	uint64_t last_dispatch;
+	bool logged_stale_dispatch_warning;
 	struct wl_list link; /**< struct wl_display::queue_list */
 };
 
@@ -117,6 +119,36 @@ struct wl_display {
 /** \endcond */
 
 static int debug_client = 0;
+
+static void
+wl_display_debug_dispatch(struct wl_display *display)
+{
+	struct wl_event_queue *queue;
+	struct timespec tp;
+	uint64_t now;
+
+	clock_gettime(CLOCK_MONOTONIC, &tp);
+	now = timespec_to_msec(&tp);
+
+	wl_list_for_each(queue, &display->queue_list, link) {
+		if (wl_list_empty(&queue->event_list) ||
+		    queue->logged_stale_dispatch_warning)
+			continue;
+
+		if (now > queue->last_dispatch + 3000) {
+			struct timespec tp;
+			unsigned int realtime;
+
+			clock_gettime(CLOCK_REALTIME, &tp);
+			realtime = (tp.tv_sec * 1000000L) + (tp.tv_nsec / 1000);
+			fprintf(stderr, "[%7u.%03u] {%s} has undispatched"
+                                        " events for more than 3 seconds\n",
+                                        realtime / 1000, realtime % 1000,
+                                        queue->name ? queue->name : "Unnamed queue");
+			queue->logged_stale_dispatch_warning = true;
+		}
+	}
+}
 
 /**
  * This helper function wakes up all threads that are
@@ -232,6 +264,14 @@ wl_event_queue_init(struct wl_event_queue *queue,
 	queue->display = display;
 	if (name)
 		queue->name = strdup(name);
+
+	if (debug_client) {
+		struct timespec tp;
+
+		clock_gettime(CLOCK_MONOTONIC, &tp);
+		queue->last_dispatch = timespec_to_msec(&tp);
+		queue->logged_stale_dispatch_warning = false;
+	}
 
 	wl_list_insert(&display->queue_list, &queue->link);
 }
@@ -907,6 +947,9 @@ wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
 	struct wl_display *disp = proxy->display;
 
 	pthread_mutex_lock(&disp->mutex);
+
+	if (debug_client)
+		wl_display_debug_dispatch(disp);
 
 	message = &proxy->object.interface->methods[opcode];
 	if (interface) {
@@ -2170,6 +2213,15 @@ wl_display_dispatch_queue_pending(struct wl_display *display,
 	pthread_mutex_lock(&display->mutex);
 
 	ret = dispatch_queue(display, queue);
+
+	if (debug_client) {
+		struct timespec tp;
+
+		clock_gettime(CLOCK_MONOTONIC, &tp);
+		queue->last_dispatch = timespec_to_msec(&tp);
+		queue->logged_stale_dispatch_warning = false;
+		wl_display_debug_dispatch(display);
+	}
 
 	pthread_mutex_unlock(&display->mutex);
 
