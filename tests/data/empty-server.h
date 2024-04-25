@@ -45,6 +45,11 @@ struct empty_interface {
 		      struct wl_resource *resource);
 };
 
+/**
+ * @ingroup iface_empty
+ */
+#define EMPTY_MAX_VERSION 1
+
 
 /**
  * @ingroup iface_empty
