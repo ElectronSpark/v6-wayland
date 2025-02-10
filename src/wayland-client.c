@@ -78,6 +78,7 @@ struct wl_event_queue {
 	struct wl_list proxy_list; /**< struct wl_proxy::queue_link */
 	struct wl_display *display;
 	char *name;
+	struct wl_list link; /**< struct wl_display::queue_list */
 };
 
 struct wl_display {
@@ -103,6 +104,7 @@ struct wl_display {
 	} protocol_error;
 	int fd;
 	struct wl_map objects;
+	struct wl_list queue_list; /**< struct wl_event_queue::link */
 	struct wl_event_queue display_queue;
 	struct wl_event_queue default_queue;
 	pthread_mutex_t mutex;
@@ -230,6 +232,8 @@ wl_event_queue_init(struct wl_event_queue *queue,
 	queue->display = display;
 	if (name)
 		queue->name = strdup(name);
+
+	wl_list_insert(&display->queue_list, &queue->link);
 }
 
 static void
@@ -343,6 +347,8 @@ wl_event_queue_release(struct wl_event_queue *queue)
 		wl_list_remove(&closure->link);
 		destroy_queued_closure(closure);
 	}
+
+	wl_list_remove(&queue->link);
 }
 
 /** Destroy an event queue
@@ -1239,6 +1245,7 @@ wl_display_connect_to_fd(int fd)
 
 	display->fd = fd;
 	wl_map_init(&display->objects, WL_MAP_CLIENT_SIDE);
+	wl_list_init(&display->queue_list);
 	wl_event_queue_init(&display->default_queue, display, "Default Queue");
 	wl_event_queue_init(&display->display_queue, display, "Display Queue");
 	pthread_mutex_init(&display->mutex, NULL);
