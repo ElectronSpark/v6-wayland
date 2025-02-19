@@ -43,6 +43,10 @@
 #include <sys/file.h>
 #include <sys/stat.h>
 
+#if defined(__QNXNTO__)
+#include <sys/rsrcdbmgr.h>
+#endif
+
 #include "wayland-util.h"
 #include "wayland-private.h"
 #include "wayland-server-private.h"
@@ -57,12 +61,20 @@
 #define UNIX_PATH_MAX	108
 #endif
 
+#if defined(__QNXNTO__)
+#define LOCK_PREFIX	"wl_display-"
+#define LOCK_PREFIXLEN	11
+#define LOCK_SUFFIXLEN LOCK_PREFIXLEN
+#else
 #define LOCK_SUFFIX	".lock"
 #define LOCK_SUFFIXLEN	5
+#endif
 
 struct wl_socket {
 	int fd;
+#if !defined(__QNXNTO__)
 	int fd_lock;
+#endif
 	struct sockaddr_un addr;
 	char lock_addr[UNIX_PATH_MAX + LOCK_SUFFIXLEN];
 	struct wl_list link;
@@ -1219,10 +1231,32 @@ wl_socket_destroy(struct wl_socket *s)
 		unlink(s->addr.sun_path);
 	if (s->fd >= 0)
 		close(s->fd);
+#if defined(__QNXNTO__)
+	if (s->lock_addr[0]) {
+		rsrc_request_t release_request = {
+			.length = 1,
+			.align = 0,
+			.start = 0,
+			.end = 0,
+			.flags = RSRCDBMGR_FLAG_NAME,
+			.name = s->lock_addr
+		};
+		rsrcdbmgr_detach(&release_request, 1);
+
+		rsrc_alloc_t destroy_request = {
+			.start = 0,
+			.end = 0,
+			.flags = RSRCDBMGR_FLAG_NAME,
+			.name = s->lock_addr
+		};
+		rsrcdbmgr_destroy(&destroy_request, 1);
+	}
+#else
 	if (s->lock_addr[0])
 		unlink(s->lock_addr);
 	if (s->fd_lock >= 0)
 		close(s->fd_lock);
+#endif
 
 	free(s);
 }
@@ -1237,7 +1271,9 @@ wl_socket_alloc(void)
 		return NULL;
 
 	s->fd = -1;
+#if !defined(__QNXNTO__)
 	s->fd_lock = -1;
+#endif
 
 	return s;
 }
@@ -1662,6 +1698,43 @@ wl_socket_lock(struct wl_socket *socket)
 {
 	struct stat socket_stat;
 
+#if defined(__QNXNTO__)
+	snprintf(socket->lock_addr, sizeof socket->lock_addr,
+		 "%s%s", LOCK_PREFIX, socket->display_name);
+
+	/* Query the resource database for any existing used blocks with this name */
+	if (0 != rsrcdbmgr_query_name(NULL, 0, 0, -1, socket->lock_addr, 0)) {
+		wl_log("lock resource %s already exists\n", socket->lock_addr);
+		goto err;
+	}
+
+	rsrc_alloc_t create_request = {
+		.start = 0,
+		.end = 0,
+		.flags = RSRCDBMGR_FLAG_NAME,
+		.name = socket->lock_addr
+	};
+	if (rsrcdbmgr_create(&create_request, 1) == -1) {
+		wl_log("unable to create lock resource %s\n",
+			socket->lock_addr);
+		goto err;
+	}
+
+	rsrc_request_t acquire_request = {
+		.length = 1,
+		.align = 0,
+		.start = 0,
+		.end = 0,
+		.flags = RSRCDBMGR_FLAG_NAME,
+		.name = socket->lock_addr
+	};
+	if (rsrcdbmgr_attach(&acquire_request, 1) == -1) {
+		wl_log("unable to acquire lock resource %s\n",
+			socket->lock_addr);
+		goto err_create;
+	}
+
+#else
 	snprintf(socket->lock_addr, sizeof socket->lock_addr,
 		 "%s%s", socket->addr.sun_path, LOCK_SUFFIX);
 
@@ -1679,6 +1752,7 @@ wl_socket_lock(struct wl_socket *socket)
 			socket->lock_addr);
 		goto err_fd;
 	}
+#endif
 
 	if (lstat(socket->addr.sun_path, &socket_stat) < 0 ) {
 		if (errno != ENOENT) {
@@ -1692,9 +1766,16 @@ wl_socket_lock(struct wl_socket *socket)
 	}
 
 	return 0;
+#if defined(__QNXNTO__)
+err_fd:
+	rsrcdbmgr_detach(&acquire_request, 1);
+err_create:
+	rsrcdbmgr_destroy(&create_request, 1);
+#else
 err_fd:
 	close(socket->fd_lock);
 	socket->fd_lock = -1;
+#endif
 err:
 	*socket->lock_addr = 0;
 	/* we did not set this value here, but without lock the
