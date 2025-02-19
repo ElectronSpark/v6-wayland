@@ -37,6 +37,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#if defined(__QNXNTO__)
+#include <sys/memstream.h>
+#endif
 #include <time.h>
 #include <ffi.h>
 
