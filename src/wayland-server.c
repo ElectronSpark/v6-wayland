@@ -82,6 +82,7 @@ struct wl_client {
 	pid_t pid;
 	uid_t uid;
 	gid_t gid;
+	char *security_context;
 	bool error;
 	struct wl_priv_signal resource_created_signal;
 	void *data;
@@ -630,6 +631,40 @@ wl_client_get_credentials(const struct wl_client *client,
 		*gid = client->gid;
 }
 
+/** Return Security context for the client
+ *
+ * \param client The display object
+ * \param security_context Returns the security_context, or NULL if
+ * a security context could not be obtained.
+ *
+ * This function returns the security context for the given client.
+ * The credentials come from getsockopt() with SO_PEERSEC, on the
+ * client socket fd.
+ *
+ * Be aware that for clients that a compositor forks and execs and
+ * then connects using socketpair(), this function will return the
+ * security context for the compositor.  The security context for
+ * the socketpair are set at creation time in the compositor.
+ *
+ * \memberof wl_client
+ */
+WL_EXPORT void
+wl_client_get_security_context(struct wl_client *client,
+				char **security_context)
+{
+	// Only initalise the security context if we have to
+	// so we don't waste heap space.
+	if (!client->security_context) {
+		if (wl_os_socket_peersec(wl_connection_get_fd(client->connection),
+		    &client->security_context) != 0) {
+			*security_context = NULL;
+			return;
+		}
+	}
+
+	*security_context = client->security_context;
+}
+
 /** Get the file descriptor for the client
  *
  * \param client The display object
@@ -980,6 +1015,8 @@ wl_client_destroy(struct wl_client *client)
 	close(wl_connection_destroy(client->connection));
 
 	wl_priv_signal_final_emit(&client->destroy_late_signal, client);
+
+	free(client->security_context);
 
 	wl_list_remove(&client->resource_created_signal.listener_list);
 
