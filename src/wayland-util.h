@@ -739,6 +739,7 @@ typedef int (*wl_dispatcher_func_t)(const void *user_data, void *target,
  * \sa wl_log_set_handler_server
  */
 typedef void (*wl_log_func_t)(const char *fmt, va_list args) WL_PRINTF(1, 0);
+typedef wl_log_func_t wl_debug_func_t;
 
 /**
  * Return value of an iterator function

@@ -236,7 +236,9 @@ void
 wl_closure_destroy(struct wl_closure *closure);
 
 extern wl_log_func_t wl_log_handler;
+extern wl_debug_func_t wl_debug_handler;
 
+void wl_debug(const char *fmt, ...);
 void wl_log(const char *fmt, ...);
 void wl_abort(const char *fmt, ...);
 
