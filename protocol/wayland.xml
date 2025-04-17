@@ -230,8 +230,43 @@
         The buffer is created offset bytes into the pool and has
         width and height as specified.  The stride argument specifies
         the number of bytes from the beginning of one row to the beginning
-        of the next.  The format is the pixel format of the buffer and
-        must be one of those advertised through the wl_shm.format event.
+        of the next; if the pixel format has multiple planes the stride
+        applies to the first plane. The format is the pixel format of the
+        buffer and must be one of those advertised through the wl_shm.format
+        event.
+
+        When the pixel format has multiple planes, the strides and starting
+        offsets of the individual planes are derived from the provided
+        stride as follows. Denote "stride", "width", "height" as the provided
+        arguments. Let "p" be the number of planes. For the sake of
+        calculating parameters, we will require that each plane, seen as a
+        width x height grid of squares, can be decomposed into an array of
+        disjoint, tightly packed, indivisible rectangular blocks (which to
+        make calculations easier, here encompass both subsampling and the
+        packing of subsampled pixel data together into short byte sequences.)
+        For each plane index "i" between 1 and p, let "blockw[i]" be the
+        width of the blocks for plane i, blockh[i] the height of the blocks,
+        and "bpb[i]" the number of bytes used to encode each block.
+        (For example: for the purely subsampled two-plane format nv12,
+        blockw[2] = blockh[2] = 2 and bpb[2] = 2, because each Cr:Cb plane
+        entry corresponds (roughly; the interpretation may be more
+        complicated) to a 2x2 region of pixels, while for the packed single
+        plane format y210, blockw[1] = 2, blockh[1] = 1, and bpb[1] = 8.
+        For p030, which has both 3x1 packing and 2x2 subsampling,
+        blockw[2] = 6, blockh[2] = 2, and bpb[2] = 8.)
+
+        Parameters are valid only if, for each plane i, width % blockw[i] = 0
+        and height % blockh[i] = 0. Furthermore, stride % bpb[1] = 0 is needed.
+        Let ext_width = stride / bpb[1]. For each plane i, ext_width must
+        satisfy ext_width % blockw[i] = 0. Then define the stride of the
+        ith plane, "stride[i]", to be ext_width * bpb[i] / blockw[i].
+        The offset of the ith plane is
+        offset + sum_{i = 1}^{i - 1} stride[i] * (height / blockh[i]); this
+        evaluates to just offset when i = 1.
+
+        Formats (like yuv420_10bit or vuy101010) whose description does not
+        match the above multiplanar, linear layout model have unspecified
+        interpretation.
 
         A buffer will keep a reference to the pool it was created from
         so it is valid to destroy the pool immediately after creating
