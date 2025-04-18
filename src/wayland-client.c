@@ -1898,10 +1898,13 @@ wl_display_prepare_read_queue(struct wl_display *display,
 			      struct wl_event_queue *queue)
 {
 	int ret;
+	bool has_events;
 
 	pthread_mutex_lock(&display->mutex);
 
-	if (!wl_list_empty(&queue->event_list)) {
+	has_events = !wl_list_empty(&queue->event_list) ||
+		     !wl_list_empty(&display->display_queue.event_list);
+	if (has_events) {
 		errno = EAGAIN;
 		ret = -1;
 	} else {
