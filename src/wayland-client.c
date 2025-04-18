@@ -1904,7 +1904,7 @@ wl_display_prepare_read_queue(struct wl_display *display,
 
 	has_events = !wl_list_empty(&queue->event_list) ||
 		     !wl_list_empty(&display->display_queue.event_list);
-	if (has_events) {
+	if (has_events || display->last_error) {
 		errno = EAGAIN;
 		ret = -1;
 	} else {
