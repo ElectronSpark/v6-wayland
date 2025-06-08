@@ -645,6 +645,19 @@ wl_resource_get_destroy_listener(struct wl_resource *resource,
 	     resource = tmp,							\
 	     tmp = wl_resource_from_link(wl_resource_get_link(resource)->next))
 
+#define wl_resource_for_each_reverse(resource, list)				\
+	for (resource = 0, resource = wl_resource_from_link((list)->prev);	\
+	     wl_resource_get_link(resource) != (list);				\
+	     resource = wl_resource_from_link(wl_resource_get_link(resource)->prev))
+
+#define wl_resource_for_each_reverse_safe(resource, tmp, list)				\
+	for (resource = 0, tmp = 0,							\
+	     resource = wl_resource_from_link((list)->prev),	\
+	     tmp = wl_resource_from_link((list)->prev->prev);	\
+	     wl_resource_get_link(resource) != (list);				\
+	     resource = tmp,							\
+	     tmp = wl_resource_from_link(wl_resource_get_link(resource)->prev))
+
 struct wl_shm_buffer *
 wl_shm_buffer_get(struct wl_resource *resource);
 
