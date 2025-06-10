@@ -1493,28 +1493,43 @@ wl_closure_queue(struct wl_closure *closure, struct wl_connection *connection)
 
 void
 wl_closure_print(struct wl_closure *closure, struct wl_object *target,
-		 int send, int discarded, uint32_t (*n_parse)(union wl_argument *arg),
-		 const char *queue_name, int color)
+		 int send, int discarded, pid_t client_pid,
+		 uint32_t (*n_parse)(union wl_argument *arg), const char *queue_name, int color)
 {
 	int i;
 	struct argument_details arg;
 	const char *signature = closure->message->signature;
-	struct timespec tp;
-	unsigned int time;
 	uint32_t nval;
 	FILE *f;
 	char *buffer;
 	size_t buffer_length;
+	char time_str[20];
 
 	f = open_memstream(&buffer, &buffer_length);
 	if (f == NULL)
 		return;
 
-	clock_gettime(CLOCK_REALTIME, &tp);
-	time = (tp.tv_sec * 1000000L) + (tp.tv_nsec / 1000);
-	fprintf(f, "%s[%7u.%03u] ",
+	if (wl_time_fmt == WL_TIME_FORMAT_EPOCH) {
+		struct timespec tp;
+		clock_gettime(CLOCK_REALTIME, &tp);
+		unsigned int time = (tp.tv_sec * 1000000L) + (tp.tv_nsec / 1000);
+		sprintf(time_str, "%7u.%03u", time / 1000, time % 1000);
+	} else {
+		time_t rawtime;
+		time(&rawtime);
+		struct tm *info = localtime(&rawtime);
+		strftime(time_str, 20, "%Y-%m-%d %H:%M:%S", info);
+	}
+
+	fprintf(f, "%s[%s] ",
 		color ? WL_DEBUG_COLOR_GREEN : "",
-		time / 1000, time % 1000);
+		time_str);
+
+	if (!send && client_pid != -1) {
+		char proc_name[50];
+		wl_get_name_by_pid(client_pid, proc_name);
+		fprintf(f, "[PID:%d%s] ", client_pid, proc_name);
+	}
 
 	if (queue_name) {
 		fprintf(f, "%s{%s} ",

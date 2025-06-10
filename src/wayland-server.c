@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <dlfcn.h>
@@ -59,6 +60,8 @@
 
 #define LOCK_SUFFIX	".lock"
 #define LOCK_SUFFIXLEN	5
+
+extern int debug_with_pid;
 
 struct wl_socket {
 	int fd;
@@ -161,7 +164,7 @@ log_closure(struct wl_resource *resource,
 	struct wl_protocol_logger_message message;
 
 	if (debug_server)
-		wl_closure_print(closure, object, send, false, NULL, NULL, debug_color);
+		wl_closure_print(closure, object, send, false, debug_with_pid ? resource->client->pid : -1, NULL, NULL, debug_color);
 
 	if (!wl_list_empty(&display->protocol_loggers)) {
 		message.resource = resource;
@@ -1177,6 +1180,8 @@ wl_display_create(void)
 	debug = getenv("WAYLAND_DEBUG");
 	if (debug && (strstr(debug, "server") || strstr(debug, "1"))) {
 		debug_server = 1;
+		if (strstr(debug, "pid"))
+			debug_with_pid = 1;
 		if (isatty(fileno(stderr)))
 			debug_color = 1;
 	}

@@ -26,6 +26,8 @@
 
 #define _GNU_SOURCE
 
+#include "../config.h"
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -34,6 +36,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <ctype.h>
@@ -48,6 +51,8 @@
 #include "timespec-util.h"
 
 /** \cond */
+
+extern int debug_with_pid;
 
 enum wl_proxy_flag {
 	WL_PROXY_FLAG_ID_DELETED = (1 << 0),
@@ -929,6 +934,12 @@ wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
 	}
 
 	if (debug_client) {
+		pid_t pid = -1;
+#if defined(HAVE_GETPID)
+		if (debug_with_pid)
+			pid = getpid();
+#endif // defined(HAVE_GETPID)
+
 		struct wl_event_queue *queue;
 		const char *queue_name = NULL;
 
@@ -936,7 +947,7 @@ wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
 		if (queue)
 			queue_name = wl_event_queue_get_name(queue);
 
-		wl_closure_print(closure, &proxy->object, true, false, NULL,
+		wl_closure_print(closure, &proxy->object, true, false, pid, NULL,
 				 queue_name, debug_color);
 	}
 
@@ -1238,6 +1249,8 @@ wl_display_connect_to_fd(int fd)
 	debug = getenv("WAYLAND_DEBUG");
 	if (debug && (strstr(debug, "client") || strstr(debug, "1"))) {
 		debug_client = 1;
+		if (strstr(debug, "pid"))
+			debug_with_pid = 1;
 		if (isatty(fileno(stderr)))
 			debug_color = 1;
 	}
@@ -1570,9 +1583,8 @@ queue_event(struct wl_display *display, int len)
 	struct wl_closure *closure;
 	const struct wl_message *message;
 	struct wl_event_queue *queue;
-	struct timespec tp;
-	unsigned int time;
 	int num_zombie_fds;
+	char time_str[20];
 
 	wl_connection_copy(display->connection, p, sizeof p);
 	id = p[0];
@@ -1590,12 +1602,33 @@ queue_event(struct wl_display *display, int len)
 			zombie->fd_count[opcode] : 0;
 
 		if (debug_client) {
-			clock_gettime(CLOCK_REALTIME, &tp);
-			time = (tp.tv_sec * 1000000L) + (tp.tv_nsec / 1000);
-			fprintf(stderr, "%s[%7u.%03u] %sdiscarded %s[%s]%s#%u%s.[event %d]%s"
+			if (wl_time_fmt == WL_TIME_FORMAT_EPOCH) {
+				struct timespec tp;
+				clock_gettime(CLOCK_REALTIME, &tp);
+				unsigned int time = (tp.tv_sec * 1000000L) + (tp.tv_nsec / 1000);
+				sprintf(time_str, "%7u.%03u", time / 1000, time % 1000);
+			} else {
+				time_t rawtime;
+				time(&rawtime);
+				struct tm *info = localtime(&rawtime);
+				strftime(time_str, 20, "%Y-%m-%d %H:%M:%S", info);
+			}
+
+			fprintf(stderr, "%s[%s] ",
+				debug_color ? WL_DEBUG_COLOR_BLUE : "",
+				time_str);
+
+#if defined(HAVE_GETPID)
+			if (debug_with_pid) {
+				pid_t pid = getpid();
+				char proc_name[50];
+				wl_get_name_by_pid(pid, proc_name);
+				fprintf(stderr, "[PID:%d%s] ", pid, proc_name);
+			}
+#endif // defined(HAVE_GETPID)
+
+			fprintf(stderr, "%sdiscarded %s[%s]%s#%u%s.[event %d]%s"
 				"(%d fd, %d byte)\n",
-				debug_color ? WL_DEBUG_COLOR_GREEN : "",
-				time / 1000, time % 1000,
 				debug_color ? WL_DEBUG_COLOR_RED : "",
 				debug_color ? WL_DEBUG_COLOR_BLUE : "",
 				zombie ? "zombie" : "unknown",
@@ -1684,8 +1717,14 @@ dispatch_event(struct wl_display *display, struct wl_event_queue *queue)
 	if (debug_client) {
 		bool discarded = proxy_destroyed ||
 				 !(proxy->dispatcher || proxy->object.implementation);
+		pid_t pid = -1;
+#if defined(HAVE_GETPID)
+			if (debug_with_pid)
+				pid = getpid();
+#endif // defined(HAVE_GETPID)
 
-		wl_closure_print(closure, &proxy->object, false, discarded,
+
+		wl_closure_print(closure, &proxy->object, false, discarded, pid,
 				 id_from_object, queue->name, debug_color);
 	}
 
@@ -1697,9 +1736,29 @@ dispatch_event(struct wl_display *display, struct wl_event_queue *queue)
 	pthread_mutex_unlock(&display->mutex);
 
 	if (proxy->dispatcher) {
+		if (debug_client) {
+			pid_t pid = -1;
+#if defined(HAVE_GETPID)
+			if (debug_with_pid)
+				pid = getpid();
+#endif // defined(HAVE_GETPID)
+			wl_closure_print(closure, &proxy->object, false, false, pid,
+				id_from_object, queue->name, debug_color);
+		}
+
 		wl_closure_dispatch(closure, proxy->dispatcher,
 				    &proxy->object, opcode);
 	} else if (proxy->object.implementation) {
+		if (debug_client) {
+			pid_t pid = -1;
+#if defined(HAVE_GETPID)
+			if (debug_with_pid)
+				pid = getpid();
+#endif // defined(HAVE_GETPID)
+			wl_closure_print(closure, &proxy->object, false, false, pid,
+				id_from_object, queue->name, debug_color);
+		}
+
 		wl_closure_invoke(closure, WL_CLOSURE_INVOKE_CLIENT,
 				  &proxy->object, opcode, proxy->user_data);
 	}
