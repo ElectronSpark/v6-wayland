@@ -2125,7 +2125,7 @@ int main(int argc, char *argv[])
 		{ "version",           no_argument, NULL, 'v' },
 		{ "include-core-only", no_argument, NULL, 'c' },
 		{ "strict",            no_argument, NULL, 's' },
-		{ "cpp-compat",		   no_argument, NULL, 'p' },
+		{ "cpp-compat",        no_argument, NULL, 'p' },
 		{ 0,                   0,           NULL, 0 }
 	};
 
