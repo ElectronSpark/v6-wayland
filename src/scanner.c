@@ -84,7 +84,9 @@ usage(int ret)
 			"                                 that is e.g. wayland-client-core.h instead\n"
 			"                                 of wayland-client.h.\n"
 			"    -s,  --strict                exit immediately with an error if DTD\n"
-			"                                 verification fails.\n");
+			"                                 verification fails.\n"
+			"    -p,  --cpp-compat            make headers c++ compatible by appending \n"
+			"                                 underscore to the reserved keywords\n");
 	exit(ret);
 }
 
@@ -1160,8 +1162,55 @@ emit_type(struct arg *a)
 	}
 }
 
+struct cpp_arg_keyword
+{
+	const char *name;
+	const char* replacement;
+};
+
+static struct cpp_arg_keyword cpp_arg_keywords[] = {
+	{ "catch", "catch_" },
+	{ "class", "class_" },
+	{ "const_cast", "const_cast_" },
+	{ "delete", "delete_" },
+	{ "dynamic_cast", "dynamic_cast_" },
+	{ "explicit", "explicit_" },
+	{ "export", "export_" },
+	{ "false", "false_" },
+	{ "friend", "friend_" },
+	{ "mutable", "mutable_" },
+	{ "namespace", "namespace_" },
+	{ "new", "new_" },
+	{ "operator", "operator_" },
+	{ "private", "private_" },
+	{ "protected", "protected_" },
+	{ "public", "public_" },
+	{ "reinterpret_cast", "reinterpret_cast_" },
+	{ "static_cast", "static_cast_" },
+	{ "template", "template_" },
+	{ "this", "this_" },
+	{ "throw", "throw_" },
+	{ "true", "true_" },
+	{ "try", "try_" },
+	{ "typeid", "typeid_" },
+	{ "typename", "typename_" },
+	{ "using", "using_" },
+	{ "wchar_t", "wchar_t_" }
+};
+
+static const char *
+sanitize_cpp_arg(const char *name)
+{
+	for (size_t i = 0; i < sizeof(cpp_arg_keywords)/sizeof(cpp_arg_keywords[0]); i++) {
+		struct cpp_arg_keyword* keyword = &cpp_arg_keywords[i];
+		if (!strcmp(keyword->name, name))
+			return keyword->replacement;
+	}
+	return name;
+}
+
 static void
-emit_stubs(struct wl_list *message_list, struct interface *interface)
+emit_stubs(struct wl_list *message_list, struct interface *interface, bool cpp_compat)
 {
 	struct message *m;
 	struct arg *a, *ret;
@@ -1266,7 +1315,10 @@ emit_stubs(struct wl_list *message_list, struct interface *interface)
 				continue;
 			printf(", ");
 			emit_type(a);
-			printf("%s", a->name);
+			if (cpp_compat)
+				printf("%s", sanitize_cpp_arg(a->name));
+			else
+				printf("%s", a->name);
 		}
 
 		printf(")\n"
@@ -1311,7 +1363,10 @@ emit_stubs(struct wl_list *message_list, struct interface *interface)
 					printf(", interface->name, version");
 				printf(", NULL");
 			} else {
-				printf(", %s", a->name);
+				if (cpp_compat)
+					printf(", %s", sanitize_cpp_arg(a->name));
+				else
+					printf(", %s", a->name);
 			}
 		}
 		printf(");\n");
@@ -1327,7 +1382,7 @@ emit_stubs(struct wl_list *message_list, struct interface *interface)
 }
 
 static void
-emit_event_wrappers(struct wl_list *message_list, struct interface *interface)
+emit_event_wrappers(struct wl_list *message_list, struct interface *interface, bool cpp_compat)
 {
 	struct message *m;
 	struct arg *a;
@@ -1344,8 +1399,12 @@ emit_event_wrappers(struct wl_list *message_list, struct interface *interface)
 		       m->name);
 		printf(" * @param resource_ The client's resource\n");
 		wl_list_for_each(a, &m->arg_list, link) {
-			if (a->summary)
-				printf(" * @param %s %s\n", a->name, a->summary);
+			if (a->summary) {
+				if (cpp_compat)
+					printf(" * @param %s %s\n", sanitize_cpp_arg(a->name), a->summary);
+				else
+					printf(" * @param %s %s\n", a->name, a->summary);
+			}
 		}
 		printf(" */\n");
 		printf("static inline void\n"
@@ -1362,7 +1421,10 @@ emit_event_wrappers(struct wl_list *message_list, struct interface *interface)
 			default:
 				emit_type(a);
 			}
-			printf("%s", a->name);
+			if (cpp_compat)
+				printf("%s", sanitize_cpp_arg(a->name));
+			else
+				printf("%s", a->name);
 		}
 
 		printf(")\n"
@@ -1500,7 +1562,7 @@ emit_enumerations(struct interface *interface, bool with_validators)
 }
 
 static void
-emit_structs(struct wl_list *message_list, struct interface *interface, enum side side)
+emit_structs(struct wl_list *message_list, struct interface *interface, enum side side, bool cpp_compat)
 {
 	struct message *m;
 	struct arg *a;
@@ -1571,7 +1633,10 @@ emit_structs(struct wl_list *message_list, struct interface *interface, enum sid
 			else
 				emit_type(a);
 
-			printf("%s", a->name);
+			if (cpp_compat)
+				printf("%s", sanitize_cpp_arg(a->name));
+			else
+				printf("%s", a->name);
 		}
 
 		printf(");\n");
@@ -1691,7 +1756,7 @@ emit_mainpage_blurb(const struct protocol *protocol, enum side side)
 }
 
 static void
-emit_header(struct protocol *protocol, enum side side)
+emit_header(struct protocol *protocol, enum side side, bool cpp_compat)
 {
 	struct interface *i, *i_next;
 	struct wl_array types;
@@ -1775,17 +1840,17 @@ emit_header(struct protocol *protocol, enum side side)
 		emit_enumerations(i, side == SERVER);
 
 		if (side == SERVER) {
-			emit_structs(&i->request_list, i, side);
+			emit_structs(&i->request_list, i, side, cpp_compat);
 			emit_opcodes(&i->event_list, i);
 			emit_opcode_versions(&i->event_list, i);
 			emit_opcode_versions(&i->request_list, i);
-			emit_event_wrappers(&i->event_list, i);
+			emit_event_wrappers(&i->event_list, i, cpp_compat);
 		} else {
-			emit_structs(&i->event_list, i, side);
+			emit_structs(&i->event_list, i, side, cpp_compat);
 			emit_opcodes(&i->request_list, i);
 			emit_opcode_versions(&i->event_list, i);
 			emit_opcode_versions(&i->request_list, i);
-			emit_stubs(&i->request_list, i);
+			emit_stubs(&i->request_list, i, cpp_compat);
 		}
 
 		free_interface(i);
@@ -2044,6 +2109,7 @@ int main(int argc, char *argv[])
 	bool version = false;
 	bool strict = false;
 	bool fail = false;
+	bool cpp_compat = false;
 	int opt;
 	enum {
 		CLIENT_HEADER,
@@ -2059,11 +2125,12 @@ int main(int argc, char *argv[])
 		{ "version",           no_argument, NULL, 'v' },
 		{ "include-core-only", no_argument, NULL, 'c' },
 		{ "strict",            no_argument, NULL, 's' },
+		{ "cpp-compat",		   no_argument, NULL, 'p' },
 		{ 0,                   0,           NULL, 0 }
 	};
 
 	while (1) {
-		opt = getopt_long(argc, argv, "hvcs", options, NULL);
+		opt = getopt_long(argc, argv, "hvcsp", options, NULL);
 
 		if (opt == -1)
 			break;
@@ -2080,6 +2147,9 @@ int main(int argc, char *argv[])
 			break;
 		case 's':
 			strict = true;
+			break;
+		case 'p':
+			cpp_compat = true;
 			break;
 		default:
 			fail = true;
@@ -2190,10 +2260,10 @@ int main(int argc, char *argv[])
 
 	switch (mode) {
 		case CLIENT_HEADER:
-			emit_header(&protocol, CLIENT);
+			emit_header(&protocol, CLIENT, cpp_compat);
 			break;
 		case SERVER_HEADER:
-			emit_header(&protocol, SERVER);
+			emit_header(&protocol, SERVER, cpp_compat);
 			break;
 		case ENUM_HEADER:
 			emit_enum_header(&protocol);
