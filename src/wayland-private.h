@@ -166,6 +166,9 @@ wl_connection_queue(struct wl_connection *connection,
 int
 wl_connection_get_fd(struct wl_connection *connection);
 
+void
+wl_connection_enable_v2(struct wl_connection *connection);
+
 size_t
 wl_connection_header_size(struct wl_connection *connection);
 
@@ -174,13 +177,15 @@ wl_connection_parse_header(struct wl_connection *connection,
 						   uint32_t *header,
 						   uint32_t *sender_id,
 						   int *size,
-						   int *opcode);
+						   int *opcode,
+						   int *num_fds);
 
 struct wl_closure {
 	int count;
 	const struct wl_message *message;
 	uint32_t opcode;
 	uint32_t sender_id;
+	int32_t num_fds;
 	union wl_argument args[WL_CLOSURE_MAX_ARGS];
 	struct wl_list link;
 	struct wl_proxy *proxy;

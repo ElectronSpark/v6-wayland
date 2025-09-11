@@ -69,6 +69,7 @@ struct wl_connection {
 	struct wl_ring_buffer fds_in, fds_out;
 	int fd;
 	int want_flush;
+	bool v2;
 };
 
 static inline size_t
@@ -619,6 +620,12 @@ wl_connection_get_fd(struct wl_connection *connection)
 	return connection->fd;
 }
 
+void
+wl_connection_enable_v2(struct wl_connection *connection)
+{
+	connection->v2 = true;
+}
+
 size_t
 wl_connection_header_size(struct wl_connection *connection)
 {
@@ -631,14 +638,21 @@ wl_connection_parse_header(struct wl_connection *connection,
 						   uint32_t *header,
 						   uint32_t *sender_id,
 						   int *size,
-						   int *opcode)
+						   int *opcode,
+						   int *num_fds)
 {
 	*sender_id = header[0];
 	uint32_t field2 = header[1];
 	uint32_t field2_hi = field2 >> 16;
 	uint32_t field2_lo = field2 & 0xffff;
 	*size = (int)field2_hi;
-	*opcode = (int)field2_lo;
+	if (connection->v2) {
+		*opcode = (int)(field2_lo >> 8);
+		*num_fds = (int)(field2_lo & 0xff);
+	} else {
+		*opcode = (int)field2_lo;
+		*num_fds = -1;
+	}
 }
 
 static int
@@ -807,6 +821,7 @@ wl_closure_init(const struct wl_message *message, uint32_t size,
 
 	closure->message = message;
 	closure->count = count;
+	closure->num_fds = -1;
 
 	/* Set these all to -1 so we can close any that have been
 	 * set to a real value during wl_closure_destroy().
@@ -826,7 +841,7 @@ wl_closure_marshal(struct wl_object *sender, uint32_t opcode,
 {
 	struct wl_closure *closure;
 	struct wl_object *object;
-	int i, count, fd, dup_fd;
+	int i, count, fd, dup_fd, num_fds = 0;
 	const char *signature;
 	struct argument_details arg;
 
@@ -874,6 +889,7 @@ wl_closure_marshal(struct wl_object *sender, uint32_t opcode,
 				return NULL;
 			}
 			closure->args[i].h = dup_fd;
+			num_fds += 1;
 			break;
 		default:
 			wl_abort("unhandled format code: '%c'\n", arg.type);
@@ -883,6 +899,7 @@ wl_closure_marshal(struct wl_object *sender, uint32_t opcode,
 
 	closure->sender_id = sender->id;
 	closure->opcode = opcode;
+	closure->num_fds = num_fds;
 
 	return closure;
 
@@ -943,7 +960,7 @@ wl_connection_demarshal(struct wl_connection *connection,
 	end = p + size / sizeof *p;
 
 	wl_connection_copy(connection, p, size);
-	wl_connection_parse_header(connection, p, &closure->sender_id, &ssize, &opcode);
+	wl_connection_parse_header(connection, p, &closure->sender_id, &ssize, &opcode, &closure->num_fds);
 	closure->opcode = (uint32_t)opcode;
 	p += wl_connection_header_size(connection) / sizeof *p;
 
@@ -1438,7 +1455,11 @@ serialize_closure(struct wl_connection *connection, struct wl_closure *closure,
 	size = (p - buffer) * sizeof *p;
 
 	buffer[0] = closure->sender_id;
+	if (connection->v2) {
+		buffer[1] = size << 16 | ((closure->opcode << 8) & 0x0000ff00) | (closure->num_fds & 0x000000ff);
+	} else {
 		buffer[1] = size << 16 | (closure->opcode & 0x0000ffff);
+	}
 
 	return size;
 

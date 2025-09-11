@@ -1214,6 +1214,118 @@ connect_to_socket(const char *name)
 	return fd;
 }
 
+struct upgrade_data {
+	struct wl_fixes **fixes;
+	struct wl_upgrade **upgrade;
+	bool *upgraded;
+};
+
+static void upgrade_global(void *data,
+						   struct wl_registry *wl_registry,
+						   uint32_t name,
+						   const char *interface,
+						   uint32_t version)
+{
+	struct upgrade_data *upgrade = data;
+	if (strcmp(interface, "wl_fixes") == 0) {
+		*upgrade->fixes = wl_registry_bind(wl_registry, name, &wl_fixes_interface, 1);
+	} else if (strcmp(interface, "wl_upgrade") == 0) {
+		*upgrade->upgrade = wl_registry_bind(wl_registry, name, &wl_upgrade_interface, 1);
+	}
+}
+
+static void upgrade_global_removed(void *data,
+						           struct wl_registry *wl_registry,
+						           uint32_t name)
+{
+	// nothing
+}
+
+static const struct wl_registry_listener upgrade_registry_listener = {
+	.global = upgrade_global,
+	.global_remove = upgrade_global_removed,
+};
+
+static void upgrade_upgraded(void *data,
+				     struct wl_upgrade *wl_upgrade)
+{
+	struct upgrade_data *upgrade = data;
+	*upgrade->upgraded = true;
+}
+
+static const struct wl_upgrade_listener upgrade_upgrade_listener = {
+	.upgraded = upgrade_upgraded,
+};
+
+static void
+try_upgrade(struct wl_display *display)
+{
+	struct wl_event_queue *queue = NULL;
+	struct wl_display *display_wrapper = NULL;
+	struct wl_registry *registry = NULL;
+	struct wl_fixes *fixes = NULL;
+	struct wl_upgrade *upgrade = NULL;
+	bool upgraded = false;
+	struct upgrade_data data = {
+		.fixes = &fixes,
+		.upgrade = &upgrade,
+		.upgraded = &upgraded,
+	};
+
+	queue = wl_display_create_queue_with_name(display, "Upgrade Queue");
+	if (!queue) {
+		goto out;
+	}
+	display_wrapper = wl_proxy_create_wrapper(display);
+	if (!display_wrapper) {
+		goto out;
+	}
+	wl_proxy_set_queue((struct wl_proxy *)display_wrapper, queue);
+	registry = wl_display_get_registry(display_wrapper);
+	if (!registry) {
+		goto out;
+	}
+	wl_registry_add_listener(registry, &upgrade_registry_listener, &data);
+	wl_display_roundtrip_queue(display, queue);
+	if (!upgrade) {
+		goto out;
+	}
+	assert(fixes);
+	wl_fixes_destroy_registry(fixes, registry);
+	wl_registry_destroy(registry);
+	registry = NULL;
+	wl_fixes_destroy(fixes);
+	fixes = NULL;
+	wl_upgrade_add_listener(upgrade, &upgrade_upgrade_listener, &data);
+	wl_upgrade_upgrade(upgrade);
+	while (!upgraded) {
+		if (wl_display_dispatch_queue(display, queue) == -1) {
+			goto out;
+		}
+	}
+	wl_connection_enable_v2(display->connection);
+
+out:
+	if (upgrade) {
+		wl_upgrade_destroy(upgrade);
+	}
+	if (registry) {
+		if (fixes) {
+			wl_fixes_destroy_registry(fixes, registry);
+		}
+		wl_registry_destroy(registry);
+	}
+	if (fixes) {
+		wl_fixes_destroy(fixes);
+	}
+	if (display_wrapper) {
+		wl_proxy_wrapper_destroy(display_wrapper);
+	}
+	if (queue) {
+		wl_event_queue_release(queue);
+	}
+}
+
 /** Connect to Wayland display on an already open fd
  *
  * \param fd The fd to use for the connection
@@ -1301,6 +1413,8 @@ wl_display_connect_to_fd(int fd)
 	display->connection = wl_connection_create(display->fd, 0);
 	if (display->connection == NULL)
 		goto err_connection;
+
+	try_upgrade(display);
 
 	return display;
 
@@ -1575,7 +1689,7 @@ queue_event(struct wl_display *display, int len)
 	int num_zombie_fds;
 
 	wl_connection_copy(display->connection, p, wl_connection_header_size(display->connection));
-	wl_connection_parse_header(display->connection, p, &id, &size, &opcode);
+	wl_connection_parse_header(display->connection, p, &id, &size, &opcode, &num_zombie_fds);
 
 	/*
 	 * If the message is larger than the maximum size of the

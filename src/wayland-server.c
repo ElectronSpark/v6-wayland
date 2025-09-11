@@ -360,7 +360,7 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	uint32_t p[WL_MAX_HEADER_U32];
 	uint32_t resource_flags;
 	uint32_t object_id;
-	int opcode, size, since;
+	int opcode, size, since, num_fds;
 	int len;
 	size_t header_size = wl_connection_header_size(connection);
 
@@ -398,7 +398,7 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 
 	while (len >= 0 && (size_t) len >= header_size) {
 		wl_connection_copy(connection, p, header_size);
-		wl_connection_parse_header(connection, p, &object_id, &size, &opcode);
+		wl_connection_parse_header(connection, p, &object_id, &size, &opcode, &num_fds);
 
 		/*
 		 * If the message is larger than the maximum size of the

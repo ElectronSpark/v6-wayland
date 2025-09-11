@@ -3296,4 +3296,18 @@
     </request>
   </interface>
 
+  <interface name="wl_upgrade" version="1">
+    <request name="destroy" type="destructor">
+      <description summary="destroys this object"/>
+    </request>
+
+    <request name="upgrade">
+      <description summary=""/>
+    </request>
+
+    <event name="upgraded">
+      <description summary=""/>
+    </event>
+  </interface>
+
 </protocol>
