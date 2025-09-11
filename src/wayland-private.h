@@ -49,6 +49,8 @@
 #define WL_CLOSURE_MAX_ARGS 20
 #define WL_BUFFER_DEFAULT_SIZE_POT 12
 #define WL_BUFFER_DEFAULT_MAX_SIZE (1 << WL_BUFFER_DEFAULT_SIZE_POT)
+#define WL_MAX_HEADER_SIZE 8
+#define WL_MAX_HEADER_U32 (WL_MAX_HEADER_SIZE / 4)
 #if WL_BUFFER_DEFAULT_MAX_SIZE < WL_MAX_MESSAGE_SIZE
 # error default buffer cannot hold maximum-sized message
 #endif
@@ -163,6 +165,16 @@ wl_connection_queue(struct wl_connection *connection,
 
 int
 wl_connection_get_fd(struct wl_connection *connection);
+
+size_t
+wl_connection_header_size(struct wl_connection *connection);
+
+void
+wl_connection_parse_header(struct wl_connection *connection,
+						   uint32_t *header,
+						   uint32_t *sender_id,
+						   int *size,
+						   int *opcode);
 
 struct wl_closure {
 	int count;

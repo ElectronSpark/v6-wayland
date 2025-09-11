@@ -1564,7 +1564,7 @@ increase_closure_args_refcount(struct wl_closure *closure)
 static int
 queue_event(struct wl_display *display, int len)
 {
-	uint32_t p[2], id;
+	uint32_t p[WL_MAX_HEADER_U32], id;
 	int opcode, size;
 	struct wl_proxy *proxy;
 	struct wl_closure *closure;
@@ -1574,10 +1574,8 @@ queue_event(struct wl_display *display, int len)
 	unsigned int time;
 	int num_zombie_fds;
 
-	wl_connection_copy(display->connection, p, sizeof p);
-	id = p[0];
-	opcode = p[1] & 0xffff;
-	size = p[1] >> 16;
+	wl_connection_copy(display->connection, p, wl_connection_header_size(display->connection));
+	wl_connection_parse_header(display->connection, p, &id, &size, &opcode);
 
 	/*
 	 * If the message is larger than the maximum size of the
@@ -1736,6 +1734,7 @@ read_events(struct wl_display *display)
 {
 	int total, rem, size;
 	uint32_t serial;
+	int header_size = wl_connection_header_size(display->connection);
 
 	display->reader_count--;
 	if (display->reader_count == 0) {
@@ -1760,7 +1759,7 @@ read_events(struct wl_display *display)
 			return -1;
 		}
 
-		for (rem = total; rem >= 8; rem -= size) {
+		for (rem = total; rem >= header_size; rem -= size) {
 			size = queue_event(display, rem);
 			if (size == -1) {
 				display_fatal_error(display, errno);
