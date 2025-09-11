@@ -1643,6 +1643,13 @@ wl_closure_print(struct wl_closure *closure, struct wl_object *target,
 		}
 	}
 
+	if (closure->num_fds > 0) {
+		if (closure->count) {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "num_fds = %d", closure->num_fds);
+	}
+
 	fprintf(f, ")%s\n", color ? WL_DEBUG_COLOR_RESET : "");
 
 	if (fclose(f) == 0) {
