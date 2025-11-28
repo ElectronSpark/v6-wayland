@@ -1933,7 +1933,7 @@
     </event>
    </interface>
 
-  <interface name="wl_seat" version="10">
+  <interface name="wl_seat" version="11">
     <description summary="group of input devices">
       A seat is a group of keyboards, pointer and touch devices. This
       object is published as a global during start up, or when such a
@@ -2067,7 +2067,7 @@
 
   </interface>
 
-  <interface name="wl_pointer" version="10">
+  <interface name="wl_pointer" version="11">
     <description summary="pointer input device">
       The wl_pointer interface represents one or more input devices,
       such as mice, which control the pointer location and pointer_focus
@@ -2480,7 +2480,7 @@
     </event>
   </interface>
 
-  <interface name="wl_keyboard" version="10">
+  <interface name="wl_keyboard" version="11">
     <description summary="keyboard input device">
       The wl_keyboard interface represents one or more keyboards
       associated with a seat.
@@ -2494,6 +2494,18 @@
 
       By default, the active surface is null, the keys currently logically down
       are empty, the active modifiers and the active group are 0.
+
+      Since version 11, clients must first negotiate the keymap format in order
+      to receive any keyboard event:
+
+      1. Client sends a set_supported_keymap_formats request,
+      2. Server responds with either:
+
+         - a keymap event, with the corresponding keymap_format being supported
+           by both the server and the client; the server is advised to use the
+           format with most features.
+         - a no_supported_keymap_format error if no common supported format is
+           found.
     </description>
 
     <enum name="keymap_format">
@@ -2504,6 +2516,8 @@
       <entry name="no_keymap" value="0"
              summary="no keymap; client must understand how to interpret the raw keycode"/>
       <entry name="xkb_v1" value="1"
+	     summary="libxkbcommon and X11 compatible, null-terminated string; to determine the xkb keycode, clients must add 8 to the key event keycode"/>
+      <entry name="xkb_v2" value="2" since="11"
              summary="libxkbcommon compatible, null-terminated string; to determine the xkb keycode, clients must add 8 to the key event keycode"/>
     </enum>
 
@@ -2659,9 +2673,32 @@
       <arg name="delay" type="int"
            summary="delay in milliseconds since key down until repeating starts"/>
     </event>
+
+    <!-- Version 11 additions -->
+
+    <request name="set_supported_keymap_formats" since="11">
+      <description summary="set the keymap formats supported by the client">
+	Inform the server of the keymap formats supported by the client, in
+	ascending order.
+
+	If none of the formats is supported by the server, then a
+	no_supported_keymap_format error is triggered.
+
+	Otherwise the server selects one of the provided format that it supports
+	itself and may start to send keyboard events. It is advised, but not
+	mandatory, to select the format with most features.
+      </description>
+      <arg name="formats" type="array"
+           summary="A list of keymap_format values, in ascending order"/>
+    </request>
+
+    <enum name="error" since="11">
+      <entry name="no_supported_keymap_format" value="0" since="11"
+	     summary="none of the keymap formats provided by the client is supported"/>
+    </enum>
   </interface>
 
-  <interface name="wl_touch" version="10">
+  <interface name="wl_touch" version="11">
     <description summary="touchscreen input device">
       The wl_touch interface represents a touchscreen
       associated with a seat.
