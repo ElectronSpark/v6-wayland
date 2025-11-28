@@ -2065,6 +2065,32 @@
       </description>
     </request>
 
+    <!-- Version 11 additions -->
+
+    <request name="get_keyboard_with_formats">
+      <description summary="return keyboard object">
+	The ID provided will be initialized to the wl_keyboard interface
+	for this seat.
+
+	This is an alternative to get_keyboard that informs the server of the
+	keymap formats supported by the client. The server selects one of the
+	provided format that it supports itself and may start to send keyboard
+	events. It is advised, but not mandatory, to respect the client’s order
+	of preference of the formats.
+
+	TODO: what if none of the format is supported?
+
+	This request only takes effect if the seat has the keyboard
+	capability, or has had the keyboard capability in the past.
+	It is a protocol violation to issue this request on a seat that has
+	never had the keyboard capability. The missing_capability error will
+	be sent in this case.
+      </description>
+      <arg name="id" type="new_id" interface="wl_keyboard" summary="seat keyboard"/>
+      <arg name="formats" type="array"
+           summary="A list of keymap_format values, ordered by preference"/>
+    </request>
+
   </interface>
 
   <interface name="wl_pointer" version="11">
@@ -2675,22 +2701,6 @@
     </event>
 
     <!-- Version 11 additions -->
-
-    <request name="set_supported_keymap_formats" since="11">
-      <description summary="set the keymap formats supported by the client">
-	Inform the server of the keymap formats supported by the client, in
-	ascending order.
-
-	If none of the formats is supported by the server, then a
-	no_supported_keymap_format error is triggered.
-
-	Otherwise the server selects one of the provided format that it supports
-	itself and may start to send keyboard events. It is advised, but not
-	mandatory, to select the format with most features.
-      </description>
-      <arg name="formats" type="array"
-           summary="A list of keymap_format values, in ascending order"/>
-    </request>
 
     <enum name="error" since="11">
       <entry name="no_supported_keymap_format" value="0" since="11"
