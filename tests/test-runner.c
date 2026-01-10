@@ -36,9 +36,11 @@
 #include <assert.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <signal.h>
 #include <sys/ptrace.h>
+#include <sys/socket.h>
 #ifdef HAVE_SYS_PROCCTL_H
 #include <sys/procctl.h>
 #elif defined(HAVE_SYS_PRCTL_H)
@@ -46,6 +48,8 @@
 #ifndef PR_SET_PTRACER
 # define PR_SET_PTRACER 0x59616d61
 #endif
+#elif defined(__APPLE__)
+#include <sys/sysctl.h>
 #endif
 
 #include "test-runner.h"
@@ -63,7 +67,12 @@ static int timeouts_enabled = 1;
 /* set to one if the output goes to the terminal */
 static int is_atty = 0;
 
+#ifdef __APPLE__
+extern const struct test __start_test_section __asm("section$start$__DATA$test_section");
+extern const struct test __stop_test_section  __asm("section$end$__DATA$test_section");
+#else
 extern const struct test __start_test_section, __stop_test_section;
+#endif
 
 static const struct test *
 find_test(const char *name)
@@ -308,6 +317,22 @@ is_debugger_attached(void)
 
 	return rc;
 }
+#elif defined(__APPLE__)
+static int
+is_debugger_attached(void)
+{
+	int ret;
+	int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid() };
+	struct kinfo_proc info;
+	size_t size;
+
+	info.kp_proc.p_flag = 0;
+	ret = sysctl(mib, sizeof(mib) / sizeof(*mib), &info, &size, NULL, 0);
+	assert(ret == 0);
+
+	return (info.kp_proc.p_flag & P_TRACED) != 0;
+}
+
 #else
 static int
 is_debugger_attached(void)
@@ -316,6 +341,43 @@ is_debugger_attached(void)
 	return 0;
 }
 #endif
+
+int
+socketpair_cloexec(int domain, int type, int protocol, int sv[2])
+{
+    int flags;
+
+#ifdef SOCK_CLOEXEC
+	if (socketpair(domain, type | SOCK_CLOEXEC, protocol, sv) == 0)
+		return 0;
+	if (errno != EINVAL)
+		return -1;
+#endif
+
+    if (socketpair(domain, type, protocol, sv) < 0)
+        return -1;
+
+    flags = fcntl(sv[0], F_GETFD);
+    if (flags < 0)
+        goto err;
+
+    if (fcntl(sv[0], F_SETFD, flags | FD_CLOEXEC) < 0)
+        goto err;
+
+    flags = fcntl(sv[1], F_GETFD);
+    if (flags < 0)
+        goto err;
+
+    if (fcntl(sv[1], F_SETFD, flags | FD_CLOEXEC) < 0)
+        goto err;
+
+    return 0;
+
+err:
+    close(sv[0]);
+    close(sv[1]);
+    return -1;
+}
 
 int main(int argc, char *argv[])
 {

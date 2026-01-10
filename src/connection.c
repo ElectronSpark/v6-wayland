@@ -316,6 +316,19 @@ wl_connection_set_max_buffer_size(struct wl_connection *connection,
 	ring_buffer_ensure_space(&connection->out, 0);
 }
 
+#ifdef __APPLE__
+static int fd_setfl_nonblock(int fd)
+{
+	int flags;
+
+	flags = fcntl(fd, F_GETFL, 0);
+	if (flags < 0)
+		return flags;
+
+	return fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+#endif
+
 struct wl_connection *
 wl_connection_create(int fd, size_t max_buffer_size)
 {
@@ -328,6 +341,10 @@ wl_connection_create(int fd, size_t max_buffer_size)
 	wl_connection_set_max_buffer_size(connection, max_buffer_size);
 
 	connection->fd = fd;
+
+#ifdef __APPLE__
+	fd_setfl_nonblock(fd);
+#endif
 
 	return connection;
 }

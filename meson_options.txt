@@ -18,6 +18,10 @@ option('docbook_validation',
   type: 'boolean',
   value: false,
   description: 'Validate the intermediate DocBook XML during the documentation build')
+option('xml_catalog',
+  description: 'Path to XML catalog file',
+  type: 'string',
+  value: '')
 option('dtd_validation',
   description: 'Validate the protocol DTD (requires libxml2)',
   type: 'boolean',

@@ -22,8 +22,16 @@ if vers.version_compare('< 2.26.0')
 	error('Dot (Graphviz) 2.26 or later is required for building documentation, found @0@.'.format(vers))
 endif
 
+run_env = environment()
+if catalog_path != ''
+	if not catalog_path.startswith('/')
+		catalog_path = meson.project_source_root() / catalog_path
+	endif
+	run_env.set('XML_CATALOG_FILES', catalog_path)
+endif
+
 manpage_xsl = 'http://docbook.sourceforge.net/release/xsl/current/manpages/docbook.xsl'
-cmd = run_command(xsltproc, '--nonet', manpage_xsl, check: false)
+cmd = run_command(xsltproc, '--nonet', manpage_xsl, env: run_env, check: false)
 if cmd.returncode() != 0
 	error('The style sheet for man pages providing "@0@" was not found.'.format(manpage_xsl))
 endif
