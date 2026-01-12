@@ -538,7 +538,7 @@
     </event>
   </interface>
 
-  <interface name="wl_data_offer" version="3">
+  <interface name="wl_data_offer" version="4">
     <description summary="offer to transfer data">
       A wl_data_offer represents a piece of data offered for transfer
       by another client (the source client).  It is used by the
@@ -731,7 +731,7 @@
     </event>
   </interface>
 
-  <interface name="wl_data_source" version="3">
+  <interface name="wl_data_source" version="4">
     <description summary="offer to transfer data">
       The wl_data_source object is the source side of a wl_data_offer.
       It is created by the source client in a data transfer and
@@ -878,15 +878,19 @@
 	into a "move" operation), so the effects of the final action must
 	always be applied in wl_data_offer.dnd_finished.
 
-	Clients can trigger cursor surface changes from this point, so
-	they reflect the current action.
+	Compositors should trigger cursor surface changes based on the
+	currently active action. This behavior is mandatory with the version 4
+	of the wl_data_device_manager interface, and optional before that.
+
+	Prior to version 3, the client holding the current wl_data_source
+	may trigger these cursor updates.
       </description>
       <arg name="dnd_action" type="uint" summary="action selected by the compositor"
 	   enum="wl_data_device_manager.dnd_action"/>
     </event>
   </interface>
 
-  <interface name="wl_data_device" version="3">
+  <interface name="wl_data_device" version="4">
     <description summary="data transfer device">
       There is one wl_data_device per seat which can be obtained
       from the global wl_data_device_manager singleton.
@@ -1047,7 +1051,7 @@
     </request>
   </interface>
 
-  <interface name="wl_data_device_manager" version="3">
+  <interface name="wl_data_device_manager" version="4">
     <description summary="data transfer interface">
       The wl_data_device_manager is a singleton global object that
       provides access to inter-client data transfer mechanisms such as
