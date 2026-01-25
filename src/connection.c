@@ -904,7 +904,14 @@ wl_connection_demarshal(struct wl_connection *connection,
 
 	/* Space for sender_id and opcode */
 	if (size < 2 * sizeof *p) {
-		wl_log("message too short, invalid header\n");
+		wl_log("message length %" PRIu32 " too short, invalid header\n", size);
+		wl_connection_consume(connection, size);
+		errno = EINVAL;
+		return NULL;
+	}
+
+	if (size % sizeof *p) {
+		wl_log("message length %" PRIu32 " invalid, not multiple of 4 bytes", size);
 		wl_connection_consume(connection, size);
 		errno = EINVAL;
 		return NULL;
@@ -1070,6 +1077,12 @@ wl_connection_demarshal(struct wl_connection *connection,
 			wl_abort("unknown type\n");
 			break;
 		}
+	}
+
+	if (p != end) {
+		wl_log("trailing junk\n");
+		errno = EINVAL;
+		goto err;
 	}
 
 	wl_connection_consume(connection, size);
