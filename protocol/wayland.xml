@@ -2195,7 +2195,7 @@
         focus on surfaces of the same surface tree, which consists of
         subsurfaces and popups on the same root surface.
         The implicit grab stops being active if either all buttons are released,
-        or some compositor-specific situations occurs (like screen locking).
+        or the compositor decides to take pointer focus away from the surface tree.
       </description>
       <arg name="serial" type="uint" summary="serial number of the button event"/>
       <arg name="time" type="uint" summary="timestamp with millisecond granularity"/>
