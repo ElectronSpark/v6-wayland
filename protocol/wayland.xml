@@ -190,7 +190,7 @@
     </event>
   </interface>
 
-  <interface name="wl_compositor" version="6">
+  <interface name="wl_compositor" version="7">
     <description summary="the compositor singleton">
       A compositor.  This object is a singleton global.  The
       compositor is in charge of combining the contents of multiple
@@ -1415,7 +1415,7 @@
     </event>
   </interface>
 
-  <interface name="wl_surface" version="6">
+  <interface name="wl_surface" version="7">
     <description summary="an onscreen surface">
       A surface is a rectangular area that may be displayed on zero
       or more outputs, and shown any number of times at the compositor's
@@ -1931,6 +1931,28 @@
       <arg name="transform" type="uint" enum="wl_output.transform"
            summary="preferred transform"/>
     </event>
+
+    <!-- Version 7 additions -->
+
+    <request name="discard_constraints" since="7">
+      <description summary="hint that existing constraints should be discarded">
+	This request hints to the compositor that the constraints of content
+	updates (CUs) that are currently enqueued in the surface queue should be
+	discarded. See the description of wl_surface.commit for the definition
+	of CUs and per-surface queues.
+
+	This hint is double-buffered state, see wl_surface.commit. It applies to
+	all CUs that are enqueued at the time of the wl_surface.commit request
+	and to their dependencies, excluding the CU created by the
+	wl_surface.commit request itself.
+
+	Clients may use this request to hint that they prioritize the
+	application of the following CUs over previously committed pacing and
+	timing constraints.
+
+	It is compositor policy which constraints are discarded.
+      </description>
+    </request>
    </interface>
 
   <interface name="wl_seat" version="10">
