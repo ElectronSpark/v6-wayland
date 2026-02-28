@@ -1971,9 +1971,12 @@
         The callback_data passed in the wl_callback.done event is unused and
         is always zero.
 
-        Sending this request without attaching a non-null buffer in the same
-        content update is a protocol error. The compositor will send the
-        no_buffer error in this case.
+        If the wl_surface is destroyed while it contains uncommitted release
+        callbacks, the wl_callback.done event is sent immediately.
+
+        If a content update is committed and contains release callbacks, it must
+        also contain a non-null buffer. Otherwise, the compositor sends the
+        no_buffer error.
       </description>
       <arg name="callback" type="new_id" interface="wl_callback" summary="callback object for the release"/>
     </request>
