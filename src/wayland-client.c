@@ -624,6 +624,10 @@ wl_proxy_destroy_caller_locks(struct wl_proxy *proxy)
 WL_EXPORT void
 wl_proxy_destroy(struct wl_proxy *proxy)
 {
+	if (proxy == NULL) {
+		return;
+	}
+
 	struct wl_display *display = proxy->display;
 
 	pthread_mutex_lock(&display->mutex);
