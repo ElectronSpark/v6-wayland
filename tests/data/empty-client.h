@@ -63,6 +63,10 @@ empty_get_version(struct empty *empty)
 static inline void
 empty_destroy(struct empty *empty)
 {
+	if (empty == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) empty);
 }
 

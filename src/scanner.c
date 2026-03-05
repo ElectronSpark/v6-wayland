@@ -1232,10 +1232,15 @@ emit_stubs(struct wl_list *message_list, struct interface *interface)
 		printf("static inline void\n"
 		       "%s_destroy(struct %s *%s)\n"
 		       "{\n"
+		       "\tif (%s == NULL) {\n"
+		       "\t\treturn;\n"
+		       "\t}\n"
+		       "\n"
 		       "\twl_proxy_destroy("
 		       "(struct wl_proxy *) %s);\n"
 		       "}\n\n",
 		       interface->name, interface->name, interface->name,
+		       interface->name,
 		       interface->name);
 	}
 
@@ -1288,6 +1293,11 @@ emit_stubs(struct wl_list *message_list, struct interface *interface)
 
 		printf(")\n"
 		       "{\n");
+		if (strcmp(m->name, "destroy") == 0)
+			printf("\tif (%s == NULL) {\n"
+			       "\t\treturn;\n"
+			       "\t}\n"
+			       "\n", interface->name);
 		printf("\t");
 		if (ret) {
 			printf("struct wl_proxy *%s;\n\n"

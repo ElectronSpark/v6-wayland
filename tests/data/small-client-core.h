@@ -237,6 +237,10 @@ intf_A_rq2(struct intf_A *intf_A, const char *str, int32_t i, uint32_t u, wl_fix
 static inline void
 intf_A_destroy(struct intf_A *intf_A)
 {
+	if (intf_A == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) intf_A,
 			 INTF_A_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) intf_A), WL_MARSHAL_FLAG_DESTROY);
 }
