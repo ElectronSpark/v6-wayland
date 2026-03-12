@@ -2858,7 +2858,7 @@
     </event>
   </interface>
 
-  <interface name="wl_output" version="4">
+  <interface name="wl_output" version="5">
     <description summary="compositor output region">
       An output describes part of the compositor geometry.  The
       compositor works in the 'compositor coordinate system' and an
@@ -3097,6 +3097,15 @@
         The description event will be followed by a done event.
       </description>
       <arg name="description" type="string" summary="output description"/>
+    </event>
+
+    <!-- Version 5 additions -->
+    <event name="removed" since="5">
+      <description summary="output is removed">
+        This event is sent when the output is no longer available. After this
+        event, no new output updates will be sent. The client should call the
+        wl_output.release request after receiving this event.
+      </description>
     </event>
   </interface>
 
