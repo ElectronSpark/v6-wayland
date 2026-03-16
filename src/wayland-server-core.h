@@ -697,6 +697,9 @@ wl_shm_buffer_create(struct wl_client *client,
 		     uint32_t id, int32_t width, int32_t height,
 		     int32_t stride, uint32_t format);
 
+int
+wl_display_init_upgrade(struct wl_display *display, uint32_t max_version);
+
 void
 wl_log_set_handler_server(wl_log_func_t handler);
 

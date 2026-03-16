@@ -28,10 +28,14 @@
     SOFTWARE.
   </copyright>
 
-  <interface name="wl_display" version="1">
+  <interface name="wl_display" version="2">
     <description summary="core global object">
       The core global object.  This is a special singleton object.  It
       is used for internal Wayland protocol features.
+
+      This interface guarantees that the semantics of requests of this interface
+      are unaffected by the minor version of this interface. The semantics of
+      events may change and new events may be added.
     </description>
 
     <request name="sync">
@@ -110,7 +114,7 @@
     </event>
   </interface>
 
-  <interface name="wl_registry" version="1">
+  <interface name="wl_registry" version="2">
     <description summary="global registry object">
       The singleton global registry object.  The server has a number of
       global objects that are available to all clients.  These objects
@@ -132,6 +136,10 @@
       request.  This creates a client-side handle that lets the object
       emit events to the client and lets the client invoke requests on
       the object.
+
+      This interface guarantees that the semantics of the messages of this
+      interface are unaffected by the minor version of this interface; and that
+      no new events will be added to any minor version of this interface.
     </description>
 
     <request name="bind">
@@ -171,6 +179,14 @@
       </description>
       <arg name="name" type="uint" summary="numeric name of the global object"/>
     </event>
+
+    <!-- Version 2 additions -->
+
+    <request name="release" type="destructor" since="2">
+      <description summary="destroys this registry">
+        Objects created from this registry are not affected by this request.
+      </description>
+    </request>
   </interface>
 
   <interface name="wl_callback" version="1" frozen="true">
@@ -3359,6 +3375,58 @@
       </description>
       <arg name="registry" type="object" interface="wl_registry"
            summary="the registry to destroy"/>
+    </request>
+  </interface>
+
+  <interface name="wl_display_upgrade" version="2">
+    <description summary="wayland upgrade object">
+      This global allows the IPC library to upgrade the version of the
+      wl_display object.
+
+      This global must not be bound more than once over the lifetime of the
+      connection, otherwise the already_bound error is emitted.
+
+      This global should only be bound by the IPC library because the IPC
+      library must be aware of the version of the wl_display object.
+
+      A compositor that advertises this global must also advertise the wl_fixes
+      global.
+    </description>
+
+    <enum name="error">
+      <description summary="wl_display_upgrade error values">
+        These errors can be emitted in response to wl_display_upgrade requests.
+      </description>
+      <entry name="already_bound" value="0"
+             summary="the wl_display_upgrade global was bound more than once"/>
+      <entry name="has_objects" value="1"
+             summary="objects other than wl_display and this object exist"/>
+      <entry name="out_of_bounds" value="2"
+             summary="the version requested by the upgrade request is out of bounds"/>
+    </enum>
+
+    <event name="max_version">
+      <description summary="the version supported by the compositor">
+        This event informs the client of the maximum wl_display version
+        supported by the compositor. It is sent immediately after this global
+        has been bound. The version is guaranteed to be at least 1.
+      </description>
+      <arg name="version" type="uint" summary="the version"/>
+    </event>
+
+    <request name="upgrade" type="destructor">
+      <description summary="upgrade the wl_display version">
+        Negotiates an upgrade of the version of the wl_display object.
+
+        At the time of the request, no objects other than the wl_display and
+        this object must exist, otherwise the has_objects error is emitted. In
+        particular, the client must use wl_fixes to destroy the registry from
+        which this object was created.
+
+        The version must be at least 1 and must not be larger than the version
+        sent in the version event, otherwise the out_of_bounds error is emitted.
+      </description>
+      <arg name="version" type="uint" summary="the version"/>
     </request>
   </interface>
 

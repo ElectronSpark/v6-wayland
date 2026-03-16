@@ -245,6 +245,9 @@ wl_display_connect_to_fd(int fd);
 void
 wl_display_disconnect(struct wl_display *display);
 
+void
+wl_display_upgrade(struct wl_display *display);
+
 int
 wl_display_get_fd(struct wl_display *display);
 

@@ -86,6 +86,7 @@ struct wl_client {
 	struct wl_priv_signal resource_created_signal;
 	void *data;
 	wl_user_data_destroy_func_t data_dtor;
+	bool has_upgrade;
 };
 
 struct wl_display {
@@ -113,6 +114,7 @@ struct wl_display {
 	struct wl_event_source *term_source;
 
 	size_t max_buffer_size;
+	uint32_t max_upgrade_version;
 };
 
 struct wl_global {
@@ -1077,8 +1079,15 @@ registry_bind(struct wl_client *client,
 		global->bind(client, global->data, version, id);
 }
 
+static void
+registry_release(struct wl_client *client, struct wl_resource *resource)
+{
+	wl_resource_destroy(resource);
+}
+
 static const struct wl_registry_interface registry_interface = {
-	registry_bind
+	.bind = registry_bind,
+	.release = registry_release,
 };
 
 static void
@@ -1114,7 +1123,7 @@ display_get_registry(struct wl_client *client,
 	struct wl_global *global;
 
 	registry_resource =
-		wl_resource_create(client, &wl_registry_interface, 1, id);
+		wl_resource_create(client, &wl_registry_interface, resource->version, id);
 	if (registry_resource == NULL) {
 		wl_client_post_no_memory(client);
 		return;
@@ -2426,6 +2435,59 @@ wl_client_set_max_buffer_size(struct wl_client *client, size_t max_buffer_size)
 		max_buffer_size = WL_BUFFER_DEFAULT_MAX_SIZE;
 
 	wl_connection_set_max_buffer_size(client->connection, max_buffer_size);
+}
+
+static void
+upgrade_display(struct wl_client *client, struct wl_resource *resource,
+		uint32_t version)
+{
+	wl_resource_destroy(resource);
+	// TODO: Check that there are no other objects.
+	if (version < 1 || version > client->display->max_upgrade_version) {
+		wl_resource_post_error(resource,
+				       WL_DISPLAY_UPGRADE_ERROR_OUT_OF_BOUNDS,
+				       "version is out of bounds");
+		return;
+	}
+	client->display_resource->version = (int)version;
+}
+
+static struct wl_display_upgrade_interface upgrade_interface = {
+	.upgrade = upgrade_display,
+};
+
+static void
+bind_upgrade(struct wl_client *client, void *data, uint32_t version,
+	     uint32_t id)
+{
+	struct wl_resource *resource;
+	resource = wl_resource_create(client, &wl_display_upgrade_interface,
+				      (int)version, id);
+	if (!resource) {
+		wl_client_post_no_memory(client);
+		return;
+	}
+	if (client->has_upgrade) {
+		wl_resource_post_error(resource,
+				       WL_DISPLAY_UPGRADE_ERROR_ALREADY_BOUND,
+				       "wl_display_upgrade has already been bound");
+		return;
+	}
+	client->has_upgrade = true;
+	wl_display_upgrade_send_max_version(resource,
+					    client->display->max_upgrade_version);
+	wl_resource_set_implementation(resource, &upgrade_interface, NULL, NULL);
+}
+
+WL_EXPORT int
+wl_display_init_upgrade(struct wl_display *display, uint32_t max_version)
+{
+	if (max_version > (uint32_t)wl_display_upgrade_interface.version)
+		max_version = wl_display_upgrade_interface.version;
+	display->max_upgrade_version = max_version;
+	if (!wl_global_create(display, &wl_display_upgrade_interface, 1, NULL, bind_upgrade))
+		return -1;
+	return 0;
 }
 
 /** \cond INTERNAL */
