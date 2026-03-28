@@ -27,6 +27,8 @@
 
 #include "../config.h"
 
+#include <limits.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -128,6 +130,34 @@ wl_os_socket_peercred(int sockfd, uid_t *uid, gid_t *gid, pid_t *pid)
 #else
 #error "Don't know how to read ucred on this platform"
 #endif
+
+int
+wl_os_socket_peersec(int sockfd, char **security_context)
+{
+#if defined(SO_PEERSEC)
+	socklen_t len = NAME_MAX;
+	char *context = NULL;
+	int r;
+
+	do {
+		char *new_context = realloc(context, len);
+		if (!new_context) {
+			free(context);
+			return -1;
+		}
+		context = new_context;
+
+		r = getsockopt(sockfd, SOL_SOCKET, SO_PEERSEC, context, &len);
+		if (r < 0 && errno != ERANGE) {
+			free(context);
+			return -1;
+		}
+	} while (r < 0 && errno == ERANGE);
+
+	*security_context = context;
+#endif
+	return 0;
+}
 
 int
 wl_os_dupfd_cloexec(int fd, int minfd)
