@@ -840,6 +840,9 @@ start_element(void *data, const char *element_name, const char **atts)
 		if (strcmp(name, "destroy") == 0 && !message->destructor)
 			fail(&ctx->loc, "destroy request should be destructor type");
 
+		if (strcmp(element_name, "event") == 0 && message->destructor)
+			fail(&ctx->loc, "event cannot have type destructor");
+
 		ctx->message = message;
 	} else if (strcmp(element_name, "arg") == 0) {
 		if (name == NULL)
