@@ -10,3 +10,4 @@
 - [X11 Application Support](./Xwayland.md)
 - [Content Updates](./Content_Updates.md)
 - [Color management](./Color.md)
+- [Specification](./Specification.md)
