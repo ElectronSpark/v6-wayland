@@ -2858,14 +2858,80 @@
     </event>
   </interface>
 
-  <interface name="wl_output" version="4">
+  <interface name="wl_output_list" version="5">
+    <description summary="output list">
+      This interface provides a way to list available outputs.
+
+      The original way to announce available outputs is to create a wl_output
+      global for every output. However, the biggest flaw with that design is that
+      output removal is racy and can lead to client crashes. The wl_output_list
+      interface provides a safer way to deal with output updates.
+
+      Note that the minimum supported wl_output_list version is 5. If this
+      global is bound with a version less than 5, the unsupported_version error
+      will be posted.
+    </description>
+
+    <enum name="error">
+      <description summary="the wl_output_list error values">
+        These errors can be emitted in response to wl_output_list requests.
+      </description>
+      <entry name="unsupported_version" value="0"
+             summary="the interface was bound with an unsupported version"/>
+    </enum>
+
+    <event name="finished" type="destructor" since="5">
+      <description summary="no new output announcements">
+        This event is sent in response to the wl_output_list.stop request. The
+        compositor will immediately destroy the wl_output_list object after
+        sending this event. The wl_output objects will be unaffected.
+
+        The client is free to destroy its client-side wl_output_list proxy object
+        after receiving this event.
+      </description>
+    </event>
+
+    <request name="stop" since="5">
+      <description summary="stop receiving updates">
+        This request indicates that the client no longer wants to receive new
+        output announcements. The compositor will send the finished event in
+        response to this request.
+
+        Since communication between the client and the compositor is asynchronous,
+        it is possible to receive the "wl_output_list.output" event after calling
+        this request. After the compositor processes the stop request, no new
+        output announcements will be sent.
+      </description>
+    </request>
+
+    <event name="output" since="5">
+      <description summary="new output">
+        This event is sent when a new output is available or after binding this
+        global to list all available outputs.
+      </description>
+      <arg name="output" type="new_id" interface="wl_output"/>
+    </event>
+  </interface>
+
+  <interface name="wl_output" version="5">
     <description summary="compositor output region">
       An output describes part of the compositor geometry.  The
       compositor works in the 'compositor coordinate system' and an
       output corresponds to a rectangular area in that space that is
       actually visible.  This typically corresponds to a monitor that
-      displays part of the compositor space.  This object is published
-      as global during start up, or when a monitor is hotplugged.
+      displays part of the compositor space.
+
+      This object is published as global during start up, or when a monitor
+      is hotplugged.
+
+      If the compositor announces the wl_output_list global, it is subject
+      to compositor policies whether available outputs are published as
+      wl_output globals too. For the compatibility reasons, it is recommended
+      that the compositors announce wl_output globals as well.
+
+      Note! New clients should use the wl_output_list instead of binding
+      wl_output globals. wl_output globals are prone to races that can lead
+      to various client crashes.
     </description>
 
     <enum name="subpixel">
@@ -3097,6 +3163,15 @@
         The description event will be followed by a done event.
       </description>
       <arg name="description" type="string" summary="output description"/>
+    </event>
+
+    <!-- Version 5 additions -->
+    <event name="removed" since="5">
+      <description summary="output is removed">
+        This event is sent when the output is no longer available. After this
+        event, no new output updates will be sent. The client should call the
+        wl_output.release request after receiving this event.
+      </description>
     </event>
   </interface>
 
