@@ -1405,6 +1405,84 @@ wl_display_disconnect(struct wl_display *display)
 	free(display);
 }
 
+struct upgrade_listener {
+	struct wl_fixes *wl_fixes;
+	struct wl_display_upgrade *wl_display_upgrade;
+	uint32_t version;
+};
+
+static void upgrade_max_version(void *data,
+				struct wl_display_upgrade *wl_display_upgrade,
+				uint32_t version)
+{
+	struct upgrade_listener *listener = data;
+	listener->version = version;
+}
+
+static struct wl_display_upgrade_listener upgrade_upgrade_listener = {
+	.max_version = upgrade_max_version,
+};
+
+static void upgrade_global(void *data, struct wl_registry *wl_registry,
+			   uint32_t name, const char *interface,
+			   uint32_t version)
+{
+	struct upgrade_listener *listener = data;
+	if (!listener->wl_fixes && strcmp(interface, wl_fixes_interface.name) == 0)
+		listener->wl_fixes = wl_registry_bind(wl_registry, name, &wl_fixes_interface, 1);
+	else if (!listener->wl_display_upgrade && strcmp(interface, wl_display_upgrade_interface.name) == 0) {
+		listener->wl_display_upgrade = wl_registry_bind(wl_registry, name, &wl_display_upgrade_interface, 1);
+		wl_display_upgrade_add_listener(listener->wl_display_upgrade, &upgrade_upgrade_listener, data);
+	}
+}
+
+static void upgrade_global_remove(void *data, struct wl_registry *wl_registry,
+				  uint32_t name)
+{
+	// nothing
+}
+
+static struct wl_registry_listener upgrade_registry_listener = {
+	.global = upgrade_global,
+	.global_remove = upgrade_global_remove,
+};
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+/** Upgrade the wl_display version.
+ *
+ * \param display The display context object
+ *
+ * Tries to upgrade the version of the wl_display. After this function returns,
+ * wl_display_get_version can be used to retrieve the new version of the
+ * wl_display.
+ *
+ * This function should be called immediately after creating the display. It
+ * must not be called any later than that or multiple times, otherwise a
+ * protocol error might occur.
+ *
+ * \memberof wl_display
+ */
+WL_EXPORT void
+wl_display_upgrade(struct wl_display *display)
+{
+	struct wl_registry *registry = wl_display_get_registry(display);
+	struct upgrade_listener listener = { };
+	wl_registry_add_listener(registry, &upgrade_registry_listener, &listener);
+	wl_display_roundtrip(display);
+	if (listener.wl_display_upgrade)
+		wl_display_roundtrip(display);
+	if (listener.wl_fixes) {
+		wl_fixes_destroy_registry(listener.wl_fixes, registry);
+		wl_fixes_destroy(listener.wl_fixes);
+	}
+	if (listener.wl_display_upgrade) {
+		uint32_t version = min(listener.version, (uint32_t)wl_display_interface.version);
+		wl_display_upgrade_upgrade(listener.wl_display_upgrade, version);
+		display->proxy.version = version;
+	}
+}
+
 /** Get a display context's file descriptor
  *
  * \param display The display context object
