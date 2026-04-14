@@ -371,10 +371,12 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	struct wl_object *object;
 	struct wl_closure *closure;
 	const struct wl_message *message;
-	uint32_t p[2];
+	uint32_t p[WL_MAX_HEADER_U32];
 	uint32_t resource_flags;
-	int opcode, size, since;
+	uint32_t object_id;
+	int opcode, size, since, num_fds;
 	int len;
+	size_t header_size = wl_connection_header_size(connection);
 
 	if (mask & WL_EVENT_HANGUP) {
 		wl_client_destroy(client);
@@ -408,10 +410,9 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 		}
 	}
 
-	while (len >= 0 && (size_t) len >= sizeof p) {
-		wl_connection_copy(connection, p, sizeof p);
-		opcode = p[1] & 0xffff;
-		size = p[1] >> 16;
+	while (len >= 0 && (size_t) len >= header_size) {
+		wl_connection_copy(connection, p, header_size);
+		wl_connection_parse_header(connection, p, &object_id, &size, &opcode, &num_fds);
 
 		/*
 		 * If the message is larger than the maximum size of the
@@ -438,12 +439,12 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 		if (len < size)
 			break;
 
-		resource = wl_map_lookup(&client->objects, p[0]);
-		resource_flags = wl_map_lookup_flags(&client->objects, p[0]);
+		resource = wl_map_lookup(&client->objects, object_id);
+		resource_flags = wl_map_lookup_flags(&client->objects, object_id);
 		if (resource == NULL) {
 			wl_resource_post_error(client->display_resource,
 					       WL_DISPLAY_ERROR_INVALID_OBJECT,
-					       "invalid object %u", p[0]);
+					       "invalid object %u", object_id);
 			break;
 		}
 

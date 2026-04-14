@@ -71,6 +71,7 @@ struct wl_connection {
 	struct wl_ring_buffer fds_in, fds_out;
 	int fd;
 	int want_flush;
+	bool v2;
 };
 
 static inline size_t
@@ -621,6 +622,41 @@ wl_connection_get_fd(struct wl_connection *connection)
 	return connection->fd;
 }
 
+void
+wl_connection_enable_v2(struct wl_connection *connection)
+{
+	connection->v2 = true;
+}
+
+size_t
+wl_connection_header_size(struct wl_connection *connection)
+{
+	// Adjust WL_HEADER_MAX_SIZE when increasing this.
+	return 8;
+}
+
+void
+wl_connection_parse_header(struct wl_connection *connection,
+						   uint32_t *header,
+						   uint32_t *sender_id,
+						   int *size,
+						   int *opcode,
+						   int *num_fds)
+{
+	*sender_id = header[0];
+	uint32_t field2 = header[1];
+	uint32_t field2_hi = field2 >> 16;
+	uint32_t field2_lo = field2 & 0xffff;
+	*size = (int)field2_hi;
+	if (connection->v2) {
+		*opcode = (int)(field2_lo >> 8);
+		*num_fds = (int)(field2_lo & 0xff);
+	} else {
+		*opcode = (int)field2_lo;
+		*num_fds = -1;
+	}
+}
+
 static int
 wl_connection_put_fd(struct wl_connection *connection, int32_t fd)
 {
@@ -787,6 +823,7 @@ wl_closure_init(const struct wl_message *message, uint32_t size,
 
 	closure->message = message;
 	closure->count = count;
+	closure->num_fds = -1;
 
 	/* Set these all to -1 so we can close any that have been
 	 * set to a real value during wl_closure_destroy().
@@ -806,7 +843,7 @@ wl_closure_marshal(struct wl_object *sender, uint32_t opcode,
 {
 	struct wl_closure *closure;
 	struct wl_object *object;
-	int i, count, fd, dup_fd;
+	int i, count, fd, dup_fd, num_fds = 0;
 	const char *signature;
 	struct argument_details arg;
 
@@ -854,6 +891,7 @@ wl_closure_marshal(struct wl_object *sender, uint32_t opcode,
 				return NULL;
 			}
 			closure->args[i].h = dup_fd;
+			num_fds += 1;
 			break;
 		default:
 			wl_abort("unhandled format code: '%c'\n", arg.type);
@@ -863,6 +901,7 @@ wl_closure_marshal(struct wl_object *sender, uint32_t opcode,
 
 	closure->sender_id = sender->id;
 	closure->opcode = opcode;
+	closure->num_fds = num_fds;
 
 	return closure;
 
@@ -896,14 +935,14 @@ wl_connection_demarshal(struct wl_connection *connection,
 	uint32_t *p, *next, *end, length, length_in_u32, id;
 	int fd;
 	char *s;
-	int i, count, num_arrays;
+	int i, count, num_arrays, ssize, opcode;
 	const char *signature;
 	struct argument_details arg;
 	struct wl_closure *closure;
 	struct wl_array *array_extra;
 
 	/* Space for sender_id and opcode */
-	if (size < 2 * sizeof *p) {
+	if (size < wl_connection_header_size(connection)) {
 		wl_log("message too short, invalid header\n");
 		wl_connection_consume(connection, size);
 		errno = EINVAL;
@@ -923,8 +962,9 @@ wl_connection_demarshal(struct wl_connection *connection,
 	end = p + size / sizeof *p;
 
 	wl_connection_copy(connection, p, size);
-	closure->sender_id = *p++;
-	closure->opcode = *p++ & 0x0000ffff;
+	wl_connection_parse_header(connection, p, &closure->sender_id, &ssize, &opcode, &closure->num_fds);
+	closure->opcode = (uint32_t)opcode;
+	p += wl_connection_header_size(connection) / sizeof *p;
 
 	signature = message->signature;
 	for (i = 0; i < count; i++) {
@@ -1285,7 +1325,7 @@ copy_fds_to_connection(struct wl_closure *closure,
 
 
 static uint32_t
-buffer_size_for_closure(struct wl_closure *closure)
+buffer_size_for_closure(struct wl_connection *connection, struct wl_closure *closure)
 {
 	const struct wl_message *message = closure->message;
 	int i, count;
@@ -1331,23 +1371,24 @@ buffer_size_for_closure(struct wl_closure *closure)
 		}
 	}
 
-	return buffer_size + 2;
+	return buffer_size + wl_connection_header_size(connection) / sizeof(uint32_t);
 }
 
 static int
-serialize_closure(struct wl_closure *closure, uint32_t *buffer,
-		  size_t buffer_count)
+serialize_closure(struct wl_connection *connection, struct wl_closure *closure,
+		  uint32_t *buffer, size_t buffer_count)
 {
 	const struct wl_message *message = closure->message;
 	unsigned int i, count, size;
 	uint32_t *p, *end;
 	struct argument_details arg;
 	const char *signature;
+	uint32_t header_words = wl_connection_header_size(connection) / sizeof(*buffer);
 
-	if (buffer_count < 2)
+	if (buffer_count < header_words)
 		goto overflow;
 
-	p = buffer + 2;
+	p = buffer + header_words;
 	end = buffer + buffer_count;
 
 	signature = message->signature;
@@ -1416,7 +1457,11 @@ serialize_closure(struct wl_closure *closure, uint32_t *buffer,
 	size = (p - buffer) * sizeof *p;
 
 	buffer[0] = closure->sender_id;
-	buffer[1] = size << 16 | (closure->opcode & 0x0000ffff);
+	if (connection->v2) {
+		buffer[1] = size << 16 | ((closure->opcode << 8) & 0x0000ff00) | (closure->num_fds & 0x000000ff);
+	} else {
+		buffer[1] = size << 16 | (closure->opcode & 0x0000ffff);
+	}
 
 	return size;
 
@@ -1438,7 +1483,7 @@ wl_closure_send(struct wl_closure *closure, struct wl_connection *connection)
 	if (copy_fds_to_connection(closure, connection))
 		return -1;
 
-	buffer_size = buffer_size_for_closure(closure);
+	buffer_size = buffer_size_for_closure(connection, closure);
 	buffer = zalloc(buffer_size * sizeof buffer[0]);
 	if (buffer == NULL) {
 		wl_log("wl_closure_send error: buffer allocation failure of "
@@ -1448,7 +1493,7 @@ wl_closure_send(struct wl_closure *closure, struct wl_connection *connection)
 		return -1;
 	}
 
-	size = serialize_closure(closure, buffer, buffer_size);
+	size = serialize_closure(connection, closure, buffer, buffer_size);
 	if (size < 0) {
 		free(buffer);
 		return -1;
@@ -1471,7 +1516,7 @@ wl_closure_queue(struct wl_closure *closure, struct wl_connection *connection)
 	if (copy_fds_to_connection(closure, connection))
 		return -1;
 
-	buffer_size = buffer_size_for_closure(closure);
+	buffer_size = buffer_size_for_closure(connection, closure);
 	buffer = malloc(buffer_size * sizeof buffer[0]);
 	if (buffer == NULL) {
 		wl_log("wl_closure_queue error: buffer allocation failure of "
@@ -1481,7 +1526,7 @@ wl_closure_queue(struct wl_closure *closure, struct wl_connection *connection)
 		return -1;
 	}
 
-	size = serialize_closure(closure, buffer, buffer_size);
+	size = serialize_closure(connection, closure, buffer, buffer_size);
 	if (size < 0) {
 		free(buffer);
 		return -1;
@@ -1655,6 +1700,13 @@ wl_closure_print(struct wl_closure *closure, struct wl_object *target,
 			fprintf(f, "fd %d", closure->args[i].h);
 			break;
 		}
+	}
+
+	if (closure->num_fds > 0) {
+		if (closure->count) {
+			fprintf(f, ", ");
+		}
+		fprintf(f, "num_fds = %d", closure->num_fds);
 	}
 
 	fprintf(f, ")%s\n", color ? WL_DEBUG_COLOR_RESET : "");
