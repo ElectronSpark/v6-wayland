@@ -8,6 +8,7 @@ srcs = files(
 	'src/Message_XML.md',
 	'src/Architecture.md',
 	'src/Introduction.md',
+	'src/Specification.md',
 	'src/images/content-updates/sync-to-desync-subsurf-3.png',
 	'src/images/content-updates/sync-subsurf-case2-2.png',
 	'src/images/content-updates/simple-synchronized-state-4.png',
