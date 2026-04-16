@@ -1128,6 +1128,10 @@ wl_registry_get_version(struct wl_registry *wl_registry)
 static inline void
 wl_registry_destroy(struct wl_registry *wl_registry)
 {
+	if (wl_registry == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_registry);
 }
 
@@ -1205,6 +1209,10 @@ wl_callback_get_version(struct wl_callback *wl_callback)
 static inline void
 wl_callback_destroy(struct wl_callback *wl_callback)
 {
+	if (wl_callback == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_callback);
 }
 
@@ -1245,6 +1253,10 @@ wl_compositor_get_version(struct wl_compositor *wl_compositor)
 static inline void
 wl_compositor_destroy(struct wl_compositor *wl_compositor)
 {
+	if (wl_compositor == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_compositor);
 }
 
@@ -1356,6 +1368,10 @@ wl_shm_pool_create_buffer(struct wl_shm_pool *wl_shm_pool, int32_t offset, int32
 static inline void
 wl_shm_pool_destroy(struct wl_shm_pool *wl_shm_pool)
 {
+	if (wl_shm_pool == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_shm_pool,
 			 WL_SHM_POOL_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_shm_pool), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -1715,6 +1731,10 @@ wl_shm_get_version(struct wl_shm *wl_shm)
 static inline void
 wl_shm_destroy(struct wl_shm *wl_shm)
 {
+	if (wl_shm == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_shm);
 }
 
@@ -1817,6 +1837,10 @@ wl_buffer_get_version(struct wl_buffer *wl_buffer)
 static inline void
 wl_buffer_destroy(struct wl_buffer *wl_buffer)
 {
+	if (wl_buffer == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_buffer,
 			 WL_BUFFER_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_buffer), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -2049,6 +2073,10 @@ wl_data_offer_receive(struct wl_data_offer *wl_data_offer, const char *mime_type
 static inline void
 wl_data_offer_destroy(struct wl_data_offer *wl_data_offer)
 {
+	if (wl_data_offer == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_data_offer,
 			 WL_DATA_OFFER_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_data_offer), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -2350,6 +2378,10 @@ wl_data_source_offer(struct wl_data_source *wl_data_source, const char *mime_typ
 static inline void
 wl_data_source_destroy(struct wl_data_source *wl_data_source)
 {
+	if (wl_data_source == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_data_source,
 			 WL_DATA_SOURCE_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_data_source), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -2569,6 +2601,10 @@ wl_data_device_get_version(struct wl_data_device *wl_data_device)
 static inline void
 wl_data_device_destroy(struct wl_data_device *wl_data_device)
 {
+	if (wl_data_device == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_data_device);
 }
 
@@ -2724,6 +2760,10 @@ wl_data_device_manager_get_version(struct wl_data_device_manager *wl_data_device
 static inline void
 wl_data_device_manager_destroy(struct wl_data_device_manager *wl_data_device_manager)
 {
+	if (wl_data_device_manager == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_data_device_manager);
 }
 
@@ -2801,6 +2841,10 @@ wl_shell_get_version(struct wl_shell *wl_shell)
 static inline void
 wl_shell_destroy(struct wl_shell *wl_shell)
 {
+	if (wl_shell == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_shell);
 }
 
@@ -3077,6 +3121,10 @@ wl_shell_surface_get_version(struct wl_shell_surface *wl_shell_surface)
 static inline void
 wl_shell_surface_destroy(struct wl_shell_surface *wl_shell_surface)
 {
+	if (wl_shell_surface == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_shell_surface);
 }
 
@@ -3447,6 +3495,10 @@ wl_surface_get_version(struct wl_surface *wl_surface)
 static inline void
 wl_surface_destroy(struct wl_surface *wl_surface)
 {
+	if (wl_surface == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_surface,
 			 WL_SURFACE_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_surface), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -3936,6 +3988,10 @@ wl_seat_get_version(struct wl_seat *wl_seat)
 static inline void
 wl_seat_destroy(struct wl_seat *wl_seat)
 {
+	if (wl_seat == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_seat);
 }
 
@@ -4451,6 +4507,10 @@ wl_pointer_get_version(struct wl_pointer *wl_pointer)
 static inline void
 wl_pointer_destroy(struct wl_pointer *wl_pointer)
 {
+	if (wl_pointer == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_pointer);
 }
 
@@ -4728,6 +4788,10 @@ wl_keyboard_get_version(struct wl_keyboard *wl_keyboard)
 static inline void
 wl_keyboard_destroy(struct wl_keyboard *wl_keyboard)
 {
+	if (wl_keyboard == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_keyboard);
 }
 
@@ -4970,6 +5034,10 @@ wl_touch_get_version(struct wl_touch *wl_touch)
 static inline void
 wl_touch_destroy(struct wl_touch *wl_touch)
 {
+	if (wl_touch == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_touch);
 }
 
@@ -5250,6 +5318,10 @@ wl_output_get_version(struct wl_output *wl_output)
 static inline void
 wl_output_destroy(struct wl_output *wl_output)
 {
+	if (wl_output == NULL) {
+		return;
+	}
+
 	wl_proxy_destroy((struct wl_proxy *) wl_output);
 }
 
@@ -5312,6 +5384,10 @@ wl_region_get_version(struct wl_region *wl_region)
 static inline void
 wl_region_destroy(struct wl_region *wl_region)
 {
+	if (wl_region == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_region,
 			 WL_REGION_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_region), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -5393,6 +5469,10 @@ wl_subcompositor_get_version(struct wl_subcompositor *wl_subcompositor)
 static inline void
 wl_subcompositor_destroy(struct wl_subcompositor *wl_subcompositor)
 {
+	if (wl_subcompositor == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_subcompositor,
 			 WL_SUBCOMPOSITOR_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_subcompositor), WL_MARSHAL_FLAG_DESTROY);
 }
@@ -5494,6 +5574,10 @@ wl_subsurface_get_version(struct wl_subsurface *wl_subsurface)
 static inline void
 wl_subsurface_destroy(struct wl_subsurface *wl_subsurface)
 {
+	if (wl_subsurface == NULL) {
+		return;
+	}
+
 	wl_proxy_marshal_flags((struct wl_proxy *) wl_subsurface,
 			 WL_SUBSURFACE_DESTROY, NULL, wl_proxy_get_version((struct wl_proxy *) wl_subsurface), WL_MARSHAL_FLAG_DESTROY);
 }
