@@ -457,7 +457,18 @@ wl_log_stderr_handler(const char *fmt, va_list arg)
 	vfprintf(stderr, fmt, arg);
 }
 
+wl_debug_func_t wl_debug_handler = wl_log_stderr_handler;
 wl_log_func_t wl_log_handler = wl_log_stderr_handler;
+
+void
+wl_debug(const char *fmt, ...)
+{
+	va_list argp;
+
+	va_start(argp, fmt);
+	wl_debug_handler(fmt, argp);
+	va_end(argp);
+}
 
 void
 wl_log(const char *fmt, ...)

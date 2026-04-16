@@ -707,6 +707,9 @@ wl_shm_buffer_create(struct wl_client *client,
 void
 wl_log_set_handler_server(wl_log_func_t handler);
 
+void
+wl_debug_set_handler_server(wl_debug_func_t handler);
+
 enum wl_protocol_logger_type {
 	WL_PROTOCOL_LOGGER_REQUEST,
 	WL_PROTOCOL_LOGGER_EVENT,

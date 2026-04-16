@@ -2844,6 +2844,12 @@ wl_proxy_wrapper_destroy(void *proxy_wrapper)
 }
 
 WL_EXPORT void
+wl_debug_set_handler_client(wl_debug_func_t handler)
+{
+	wl_debug_handler = handler;
+}
+
+WL_EXPORT void
 wl_log_set_handler_client(wl_log_func_t handler)
 {
 	wl_log_handler = handler;

@@ -320,6 +320,9 @@ void
 wl_log_set_handler_client(wl_log_func_t handler);
 
 void
+wl_debug_set_handler_client(wl_debug_func_t handler);
+
+void
 wl_display_set_max_buffer_size(struct wl_display *display,
                                size_t max_buffer_size);
 

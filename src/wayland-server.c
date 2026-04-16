@@ -2249,6 +2249,12 @@ wl_resource_create(struct wl_client *client,
 }
 
 WL_EXPORT void
+wl_debug_set_handler_server(wl_debug_func_t handler)
+{
+	wl_debug_handler = handler;
+}
+
+WL_EXPORT void
 wl_log_set_handler_server(wl_log_func_t handler)
 {
 	wl_log_handler = handler;

@@ -1660,7 +1660,7 @@ wl_closure_print(struct wl_closure *closure, struct wl_object *target,
 	fprintf(f, ")%s\n", color ? WL_DEBUG_COLOR_RESET : "");
 
 	if (fclose(f) == 0) {
-		fprintf(stderr, "%s", buffer);
+		wl_debug("%s", buffer);
 		free(buffer);
 	}
 }
