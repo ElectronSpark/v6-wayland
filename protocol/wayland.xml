@@ -2240,6 +2240,13 @@
         kernel's event code list. All other button codes above 0xFFFF are
         currently undefined but may be used in future versions of this
         protocol.
+
+        When a button is pressed, an implicit pointer grab is started.
+        While the implicit grab is active, the compositor should keep pointer
+        focus on surfaces of the same surface tree, which consists of
+        subsurfaces and popups on the same root surface.
+        The implicit grab stops being active if either all buttons are released,
+        or the compositor decides to take pointer focus away from the surface tree.
       </description>
       <arg name="serial" type="uint" summary="serial number of the button event"/>
       <arg name="time" type="uint" summary="timestamp with millisecond granularity"/>
