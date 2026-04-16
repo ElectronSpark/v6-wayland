@@ -1984,7 +1984,7 @@
     </request>
    </interface>
 
-  <interface name="wl_seat" version="10">
+  <interface name="wl_seat" version="11">
     <description summary="group of input devices">
       A seat is a group of keyboards, pointer and touch devices. This
       object is published as a global during start up, or when such a
@@ -2116,9 +2116,17 @@
       </description>
     </request>
 
+    <!-- Version 11 additions -->
+
+    <event name="removed" since="11">
+      <description summary="seat is removed">
+        This event is sent when the seat is no longer available. The client
+        should call the wl_seat.release request after receiving this event.
+      </description>
+    </event>
   </interface>
 
-  <interface name="wl_pointer" version="10">
+  <interface name="wl_pointer" version="11">
     <description summary="pointer input device">
       The wl_pointer interface represents one or more input devices,
       such as mice, which control the pointer location and pointer_focus
@@ -2531,7 +2539,7 @@
     </event>
   </interface>
 
-  <interface name="wl_keyboard" version="10">
+  <interface name="wl_keyboard" version="11">
     <description summary="keyboard input device">
       The wl_keyboard interface represents one or more keyboards
       associated with a seat.
@@ -2712,7 +2720,7 @@
     </event>
   </interface>
 
-  <interface name="wl_touch" version="10">
+  <interface name="wl_touch" version="11">
     <description summary="touchscreen input device">
       The wl_touch interface represents a touchscreen
       associated with a seat.
@@ -2858,7 +2866,7 @@
     </event>
   </interface>
 
-  <interface name="wl_output" version="4">
+  <interface name="wl_output" version="5">
     <description summary="compositor output region">
       An output describes part of the compositor geometry.  The
       compositor works in the 'compositor coordinate system' and an
@@ -3097,6 +3105,15 @@
         The description event will be followed by a done event.
       </description>
       <arg name="description" type="string" summary="output description"/>
+    </event>
+
+    <!-- Version 5 additions -->
+    <event name="removed" since="5">
+      <description summary="output is removed">
+        This event is sent when the output is no longer available. After this
+        event, no new output updates will be sent. The client should call the
+        wl_output.release request after receiving this event.
+      </description>
     </event>
   </interface>
 
