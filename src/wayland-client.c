@@ -38,7 +38,6 @@
 #include <sys/un.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <pthread.h>
 
 #include "wayland-util.h"
@@ -2055,7 +2054,7 @@ wl_display_poll(struct wl_display *display,
 			timespec_sub_saturate(&result, &deadline, &now);
 			remaining_timeout = &result;
 		}
-		ret = ppoll(pfd, 1, remaining_timeout, NULL);
+		ret = wl_os_ppoll(pfd, 1, remaining_timeout, NULL);
 	} while (ret == -1 && errno == EINTR);
 
 	return ret;

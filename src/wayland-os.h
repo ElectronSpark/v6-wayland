@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <poll.h>
 
 int
 wl_os_socket_cloexec(int domain, int type, int protocol);
@@ -51,6 +52,9 @@ void *
 wl_os_mremap_maymove(int fd, void *old_data, ssize_t *old_size,
 		     ssize_t new_size, int prot, int flags);
 
+int
+wl_os_ppoll(struct pollfd *fds, nfds_t nfds,
+      const struct timespec *timeout_ts, const sigset_t *sigmask);
 
 /*
  * The following are for wayland-os.c and the unit tests.
