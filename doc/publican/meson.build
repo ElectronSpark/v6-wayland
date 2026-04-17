@@ -22,6 +22,7 @@ endforeach
 publican_inputs += custom_target(
 	'ProtocolSpec.xml',
 	command: [ xsltproc, '-o', '@OUTPUT@', proto_to_docboox_xsl, '@INPUT@' ],
+	env: run_env,
 	input: wayland_protocol_xml,
 	output: 'ProtocolSpec.xml'
 )
@@ -29,6 +30,7 @@ publican_inputs += custom_target(
 publican_inputs += custom_target(
 	'ProtocolInterfaces.xml',
 	command: [ xsltproc, '-o', '@OUTPUT@', proto_iface_to_docboox_xsl, '@INPUT@' ],
+	env: run_env,
 	input: wayland_protocol_xml,
 	output: 'ProtocolInterfaces.xml'
 )
@@ -39,6 +41,7 @@ publican_inputs += custom_target(
 ClientAPI_combined = custom_target(
 	'ClientAPI-combine-doxygen-files',
 	command: [ xsltproc, '-o', '@OUTPUT@', '@INPUT@' ],
+	env: run_env,
 	input: [ doxygen_Client_combine_xslt, doxygen_Client_index_xml ],
 	output: 'ClientAPI-combined.xml'
 )
@@ -47,6 +50,7 @@ ClientAPI_combined = custom_target(
 publican_inputs += custom_target(
 	'ClientAPI-doxygen-to-docbook',
 	command: [ xsltproc, '-o', '@OUTPUT@', '--stringparam', 'which', 'Client', to_publican_xsl, '@INPUT@' ],
+	env: run_env,
 	input: ClientAPI_combined,
 	output: 'ClientAPI.xml'
 )
@@ -54,6 +58,7 @@ publican_inputs += custom_target(
 ServerAPI_combined = custom_target(
 	'ServerAPI-combine-doxygen-files',
 	command: [ xsltproc, '-o', '@OUTPUT@', '@INPUT@' ],
+	env: run_env,
 	input: [ doxygen_Server_combine_xslt, doxygen_Server_index_xml ],
 	output: 'ServerAPI-combined.xml'
 )
@@ -61,6 +66,7 @@ ServerAPI_combined = custom_target(
 publican_inputs += custom_target(
 	'ServerAPI-doxygen-to-docbook',
 	command: [ xsltproc, '-o', '@OUTPUT@', '--stringparam', 'which', 'Server', to_publican_xsl, '@INPUT@' ],
+	env: run_env,
 	input: ServerAPI_combined,
 	output: 'ServerAPI.xml'
 )
@@ -87,6 +93,7 @@ custom_target(
 		'html',
 		'@INPUT0@'
 	],
+	env: run_env,
 	input: publican_inputs,
 	output: 'html',
 	build_by_default: true,

@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/signalfd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <ctype.h>

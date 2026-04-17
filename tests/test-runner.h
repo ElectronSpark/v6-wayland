@@ -37,11 +37,17 @@ struct test {
 	int must_fail;
 } __attribute__ ((aligned (16)));
 
+#ifdef __APPLE__
+#define TEST_SECTION "__DATA,test_section"
+#else
+#define TEST_SECTION "test_section"
+#endif
+
 #define TEST(name)							\
 	static void name(void);						\
 									\
 	const struct test test##name					\
-		 __attribute__ ((used, section ("test_section"))) = {	\
+		 __attribute__ ((used, section (TEST_SECTION))) = {	\
 		#name, name, 0						\
 	};								\
 									\
@@ -51,7 +57,7 @@ struct test {
 	static void name(void);						\
 									\
 	const struct test test##name					\
-		 __attribute__ ((used, section ("test_section"))) = {	\
+		 __attribute__ ((used, section (TEST_SECTION))) = {	\
 		#name, name, 1						\
 	};								\
 									\
@@ -85,6 +91,9 @@ test_sleep(unsigned int);
 
 void
 test_disable_coredumps(void);
+
+int
+socketpair_cloexec(int domain, int type, int protocol, int sv[2]);
 
 #define DISABLE_LEAK_CHECKS				\
 	do {						\

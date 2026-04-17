@@ -44,6 +44,17 @@
 
 #define ARRAY_LENGTH(a) (sizeof (a) / sizeof (a)[0])
 
+#ifdef __APPLE__
+static void *memrchr(const void *s, int c, size_t n) {
+	const unsigned char *p = (const unsigned char *)s;
+	while (n--) {
+		if (p[n] == (unsigned char)c)
+			return (void *)(p + n);
+	}
+	return NULL;
+}
+#endif
+
 static void
 registry_handle_global(void *data, struct wl_registry *registry,
 		       uint32_t id, const char *interface, uint32_t version)

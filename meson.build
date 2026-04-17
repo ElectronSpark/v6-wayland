@@ -20,7 +20,9 @@ config_h.set_quoted('PACKAGE', meson.project_name())
 config_h.set_quoted('PACKAGE_VERSION', meson.project_version())
 
 cc_args = []
-if host_machine.system() not in ['freebsd', 'openbsd']
+if host_machine.system() == 'darwin'
+	cc_args += ['-D_DARWIN_C_SOURCE']
+elif host_machine.system() not in ['freebsd', 'openbsd']
 	cc_args += ['-D_POSIX_C_SOURCE=200809L']
 endif
 add_project_arguments(cc_args, language: 'c')
@@ -73,10 +75,17 @@ if host_machine.system() == 'freebsd'
 endif
 config_h.set10('HAVE_BROKEN_MSG_CMSG_CLOEXEC', have_broken_msg_cmsg_cloexec)
 
+has_itimerspec = cc.has_type(
+	'struct itimerspec',
+	prefix: '#include <time.h>',
+	args: '-D_POSIX_C_SOURCE=200809L'
+)
+config_h.set('HAVE_ITIMERSPEC', has_itimerspec)
+
 if get_option('libraries')
-	if host_machine.system() in ['freebsd', 'openbsd']
-		# When building for FreeBSD, epoll(7) is provided by a userspace
-		# wrapper around kqueue(2).
+	if host_machine.system() in ['freebsd', 'openbsd', 'darwin']
+		# When building for FreeBSD, OpenBSD or Darwin, epoll(7) is provided
+		# by a userspace wrapper around kqueue(2).
 		epoll_dep = dependency('epoll-shim')
 	else
 		# Otherwise, assume that epoll(7) is supported natively.
@@ -111,6 +120,8 @@ configure_file(
 )
 
 wayland_protocol_xml = files('protocol/wayland.xml')
+
+catalog_path = get_option('xml_catalog')
 
 root_inc = include_directories('.')
 protocol_inc = include_directories('protocol')
