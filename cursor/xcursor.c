@@ -29,6 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <dirent.h>
 
 /*
@@ -438,8 +439,45 @@ xcursor_read_image(FILE *file,
 	return image;
 }
 
+static struct xcursor_image *
+xcursor_resize_image (struct xcursor_image *src, int size)
+{
+	uint32_t dest_y, dest_x;
+	double scale = (double) size / src->size;
+	struct xcursor_image *dest;
+
+	if (size < 0)
+		return NULL;
+	if (size > XCURSOR_IMAGE_MAX_SIZE)
+		return NULL;
+
+	dest = xcursor_image_create((int) (src->width * scale),
+				    (int) (src->height * scale));
+	if (!dest)
+		return NULL;
+
+	dest->size = (uint32_t) size;
+	dest->xhot = (uint32_t) (src->xhot * scale);
+	dest->yhot = (uint32_t) (src->yhot * scale);
+	dest->delay = src->delay;
+
+	for (dest_y = 0; dest_y < dest->height; dest_y++)
+	{
+		uint32_t src_y = (uint32_t) (dest_y / scale);
+		uint32_t *src_row = src->pixels + (src_y * src->width);
+		uint32_t *dest_row = dest->pixels + (dest_y * dest->width);
+		for (dest_x = 0; dest_x < dest->width; dest_x++)
+		{
+			uint32_t src_x = (uint32_t) (dest_x / scale);
+			dest_row[dest_x] = src_row[src_x];
+		}
+	}
+
+	return dest;
+}
+
 static struct xcursor_images *
-xcursor_xc_file_load_images(FILE *file, int size)
+xcursor_xc_file_load_images(FILE *file, int size, bool resize)
 {
 	struct xcursor_file_header *file_header;
 	uint32_t best_size;
@@ -467,8 +505,15 @@ xcursor_xc_file_load_images(FILE *file, int size)
 		toc = xcursor_find_image_toc(file_header, best_size, n);
 		if (toc < 0)
 			break;
-		images->images[images->nimage] = xcursor_read_image(file, file_header,
-								    toc);
+		struct xcursor_image *image = xcursor_read_image(file, file_header, toc);
+		if (!image)
+			break;
+		if (resize && image->size != (uint32_t) size) {
+			struct xcursor_image *resized_image = xcursor_resize_image(image, size);
+			xcursor_image_destroy(image);
+			image = resized_image;
+		}
+		images->images[images->nimage] = image;
 		if (!images->images[images->nimage])
 			break;
 		images->nimage++;
@@ -682,6 +727,40 @@ xcursor_theme_inherits(const char *full)
 	return result;
 }
 
+static int
+xcursor_default_parse_bool(const char *v)
+{
+	char c0;
+
+	c0 = *v;
+	if (isupper ((int)c0))
+		c0 = (char) tolower (c0);
+	if (c0 == 't' || c0 == 'y' || c0 == '1')
+		return 1;
+	if (c0 == 'f' || c0 == 'n' || c0 == '0')
+		return 0;
+	if (c0 == 'o')
+	{
+		char c1 = v[1];
+		if (isupper ((int)c1))
+			c1 = (char) tolower (c1);
+		if (c1 == 'n')
+			return 1;
+		if (c1 == 'f')
+			return 0;
+	}
+	return -1;
+}
+
+static bool
+xcursor_get_resizable(void)
+{
+	const char *v = getenv("XCURSOR_RESIZED");
+	if (!v)
+		return false;
+	return xcursor_default_parse_bool(v) > 0;
+}
+
 static void
 load_all_cursors_from_dir(const char *path, int size,
 			  void (*load_callback)(struct xcursor_images *, void *),
@@ -699,6 +778,8 @@ load_all_cursors_from_dir(const char *path, int size,
 	dir = opendir(path);
 	if (!dir)
 		return;
+
+	const bool resize = xcursor_get_resizable();
 
 	for (ent = readdir(dir); ent; ent = readdir(dir)) {
 #ifdef _DIRENT_HAVE_D_TYPE
@@ -718,7 +799,7 @@ load_all_cursors_from_dir(const char *path, int size,
 			continue;
 		}
 
-		images = xcursor_xc_file_load_images(f, size);
+		images = xcursor_xc_file_load_images(f, size, resize);
 
 		if (images) {
 			images->name = strdup(ent->d_name);
