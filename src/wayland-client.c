@@ -26,12 +26,15 @@
 
 #define _GNU_SOURCE
 
+#include "../config.h"
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <errno.h>
+#include <limits.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
@@ -2055,7 +2058,20 @@ wl_display_poll(struct wl_display *display,
 			timespec_sub_saturate(&result, &deadline, &now);
 			remaining_timeout = &result;
 		}
+#ifdef HAVE_PPOLL
 		ret = ppoll(pfd, 1, remaining_timeout, NULL);
+#else
+		if (remaining_timeout) {
+			long timeout_ms =
+				remaining_timeout->tv_sec * 1000 +
+				(remaining_timeout->tv_nsec + 999999) / 1000000;
+			if (timeout_ms > INT_MAX)
+				timeout_ms = INT_MAX;
+			ret = poll(pfd, 1, (int)timeout_ms);
+		} else {
+			ret = poll(pfd, 1, -1);
+		}
+#endif
 	} while (ret == -1 && errno == EINTR);
 
 	return ret;
