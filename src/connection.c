@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <limits.h>
 #include <sys/uio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -60,7 +61,7 @@ struct wl_ring_buffer {
 	char *data;
 	size_t head, tail;
 	uint32_t size_bits;
-	uint32_t max_size_bits;  /* 0 for unlimited */
+	uint32_t max_size_bits;
 };
 
 #define MAX_FDS_OUT	28
@@ -73,11 +74,24 @@ struct wl_connection {
 	int want_flush;
 };
 
+/* Pointer arithmetic beyond PTRDIFF_MAX is broken, so don't rely on it.
+ * ((ptrdiff_t)1 << (CHAR_BIT * sizeof(ptrdiff_t) - 1)) is undefined behavior
+ * (wrapping to PTRDIFF_MIN with -fwrapv), not PTRDIFF_MAX, so limit buffer size
+ * to ((size_t)1 << (CHAR_BIT * sizeof(ptrdiff_t) - 2)).  int is used for
+ * sizes in various places, so for safety also use
+ * ((size_t)1 << (CHAR_BIT * sizeof(int) - 2)) as a limit.
+ */
+#if PTRDIFF_MAX < INT_MAX
+# define WL_BUFFER_MAX_SIZE_POT ((size_t)(CHAR_BIT * sizeof(ptrdiff_t) - 2))
+#else
+# define WL_BUFFER_MAX_SIZE_POT ((size_t)(CHAR_BIT * sizeof(int) - 2))
+#endif
+
 static inline size_t
 size_pot(uint32_t size_bits)
 {
-	if (!(size_bits < 8 * sizeof(size_t)))
-		wl_abort("Too many bits for size_t\n");
+	if (size_bits > WL_BUFFER_MAX_SIZE_POT)
+		wl_abort("Too many bits for ring buffer\n");
 
 	return ((size_t)1) << size_bits;
 }
@@ -198,11 +212,8 @@ get_max_size_bits_for_size(size_t buffer_size)
 {
 	uint32_t max_size_bits = WL_BUFFER_DEFAULT_SIZE_POT;
 
-	/* buffer_size == 0 means unbound buffer size */
-	if (buffer_size == 0)
-		return 0;
 
-	while (max_size_bits < 8 * sizeof(size_t) && size_pot(max_size_bits) < buffer_size)
+	while (max_size_bits < WL_BUFFER_MAX_SIZE_POT && size_pot(max_size_bits) < buffer_size)
 		max_size_bits++;
 
 	return max_size_bits;
@@ -232,10 +243,7 @@ ring_buffer_get_bits_for_size(struct wl_ring_buffer *b, size_t net_size)
 {
 	size_t max_size_bits = get_max_size_bits_for_size(net_size);
 
-	if (max_size_bits < WL_BUFFER_DEFAULT_SIZE_POT)
-		max_size_bits = WL_BUFFER_DEFAULT_SIZE_POT;
-
-	if (b->max_size_bits > 0 && max_size_bits > b->max_size_bits)
+	if (max_size_bits > b->max_size_bits)
 		max_size_bits = b->max_size_bits;
 
 	return max_size_bits;
@@ -301,7 +309,12 @@ wl_connection_set_max_buffer_size(struct wl_connection *connection,
 {
 	uint32_t max_size_bits;
 
-	max_size_bits = get_max_size_bits_for_size(max_buffer_size);
+	/* Max buffer size 0 means allow buffers limited only by integer
+	 * sizes or available memory, whichever runs out first.
+	 */
+	max_size_bits = max_buffer_size != 0 ?
+		get_max_size_bits_for_size(max_buffer_size) :
+		WL_BUFFER_MAX_SIZE_POT;
 
 	connection->fds_in.max_size_bits = max_size_bits;
 	ring_buffer_ensure_space(&connection->fds_in, 0);
