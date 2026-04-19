@@ -51,6 +51,7 @@ have_funcs = [
 	'getpeereid',
 	'mkostemp',
 	'posix_fallocate',
+	'ppoll',
 	'prctl',
 	'memfd_create',
 	'mremap',
