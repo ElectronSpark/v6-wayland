@@ -24,6 +24,7 @@
  */
 
 #define _GNU_SOURCE /* For memrchr */
+#include "../config.h"
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,6 +36,19 @@
 #include <sys/wait.h>
 #include <assert.h>
 #include <signal.h>
+
+#ifndef HAVE_MEMRCHR
+static void *
+memrchr(const void *s, int c, size_t n)
+{
+	const unsigned char *p = (const unsigned char *)s + n;
+	while (n--) {
+		if (*--p == (unsigned char)c)
+			return (void *)p;
+	}
+	return NULL;
+}
+#endif
 
 #include "wayland-client.h"
 #include "wayland-server.h"

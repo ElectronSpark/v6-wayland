@@ -49,6 +49,7 @@ endforeach
 have_funcs = [
 	'accept4',
 	'getpeereid',
+	'memrchr',
 	'mkostemp',
 	'posix_fallocate',
 	'ppoll',
