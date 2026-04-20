@@ -40,6 +40,11 @@
 #include <sys/ucred.h>
 #endif
 
+#if defined(__QNXNTO__)
+#include <sys/un.h>
+#include <sys/ucred.h>
+#endif
+
 #include "wayland-os.h"
 
 /* used by tests */
@@ -85,7 +90,31 @@ wl_os_socket_cloexec(int domain, int type, int protocol)
 	return set_cloexec_or_close(fd);
 }
 
-#if defined(__FreeBSD__)
+#if defined(__QNXNTO__)
+int
+wl_os_socket_peercred(int sockfd, uid_t *uid, gid_t *gid, pid_t *pid)
+{
+	socklen_t len;
+	struct xucred ucred;
+
+	len = sizeof(ucred);
+	if (getsockopt(sockfd, SOL_LOCAL, LOCAL_PEERCRED, &ucred, &len) < 0) {
+		if (errno != ENOTCONN)
+			return -1;
+		/* LOCAL_PEERCRED will report ENOTCONN for socketpair sockets */
+		*pid = getpid();
+		*uid = getuid();
+		*gid = getgid();
+	} else if (ucred.cr_version != XUCRED_VERSION) {
+		return -1;
+	} else {
+		*uid = ucred.cr_uid;
+		*gid = ucred.cr_gid;
+		*pid = ucred.cr_pid;
+	}
+	return 0;
+}
+#elif defined(__FreeBSD__)
 int
 wl_os_socket_peercred(int sockfd, uid_t *uid, gid_t *gid, pid_t *pid)
 {
