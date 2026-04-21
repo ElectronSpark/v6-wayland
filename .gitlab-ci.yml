@@ -175,6 +175,11 @@ armv7-debian-container_prep:
   variables:
     MESON_BUILD_TYPE: "-Dbuildtype=release"
 
+.build-oldstd:
+  stage: "Other build configurations"
+  variables:
+    MESON_ARGS: "-Dc_std=c11"
+
 
 # OS/architecture-specific variants
 .build-env-debian-x86_64:
@@ -222,7 +227,7 @@ armv7-debian-container_prep:
     - .ci-rules
   stage: "Build and test"
   script:
-    - meson setup $BUILDDIR --prefix="$PREFIX" -Dicon_directory=/usr/share/X11/icons --fatal-meson-warnings -Dwerror=true ${MESON_BUILD_TYPE}
+    - meson setup $BUILDDIR --prefix="$PREFIX" -Dicon_directory=/usr/share/X11/icons --fatal-meson-warnings -Dwerror=true ${MESON_BUILD_TYPE} ${MESON_ARGS}
     - ninja -C $BUILDDIR -k0 -j${FDO_CI_CONCURRENT:-4}
     - meson test -C $BUILDDIR --num-processes ${FDO_CI_CONCURRENT:-4}
     - ninja -C $BUILDDIR install
@@ -279,6 +284,12 @@ x86_64-release-debian-build:
     - .do-build
     - .build-release
 
+x86_64-oldstd-debian-build:
+  extends:
+    - .build-env-debian-x86_64
+    - .do-build
+    - .build-oldstd
+
 aarch64-debian-build:
   extends:
     - .build-env-debian-aarch64
@@ -290,6 +301,12 @@ aarch64-release-debian-build:
     - .do-build
     - .build-release
 
+aarch64-oldstd-debian-build:
+  extends:
+    - .build-env-debian-aarch64
+    - .do-build
+    - .build-oldstd
+
 armv7-debian-build:
   extends:
     - .build-env-debian-armv7
@@ -300,6 +317,12 @@ armv7-release-debian-build:
     - .build-env-debian-armv7
     - .do-build
     - .build-release
+
+armv7-oldstd-debian-build:
+  extends:
+    - .build-env-debian-armv7
+    - .do-build
+    - .build-oldstd
 
 # Base variables used for anything using a FreeBSD environment
 .os-freebsd:
