@@ -1117,7 +1117,7 @@
         or drags initiated with other buttons than BTN_LEFT to specific
         actions (e.g. "ask").
       </description>
-      <entry name="none" value="0" summary="no action"/>
+      <entry name="none" value="0" summary="no action" valid-zero="true"/>
       <entry name="copy" value="1" summary="copy action"/>
       <entry name="move" value="2" summary="move action"/>
       <entry name="ask" value="4" summary="ask action"/>
@@ -1205,7 +1205,7 @@
         use this information to adapt its behavior, e.g. choose
         an appropriate cursor image.
       </description>
-      <entry name="none" value="0" summary="no edge"/>
+      <entry name="none" value="0" summary="no edge" valid-zero="true"/>
       <entry name="top" value="1" summary="top edge"/>
       <entry name="bottom" value="2" summary="bottom edge"/>
       <entry name="left" value="4" summary="left edge"/>

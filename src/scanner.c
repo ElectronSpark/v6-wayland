@@ -737,6 +737,7 @@ start_element(void *data, const char *element_name, const char **atts)
 	const char *bitfield = NULL;
 	const char *frozen = NULL;
 	int i, version = 0;
+	bool valid_zero = false;
 
 	ctx->loc.line_number = XML_GetCurrentLineNumber(ctx->parser);
 	for (i = 0; atts[i]; i += 2) {
@@ -761,6 +762,14 @@ start_element(void *data, const char *element_name, const char **atts)
 			deprecated_since = atts[i + 1];
 		if (strcmp(atts[i], "allow-null") == 0)
 			allow_null = atts[i + 1];
+		if (strcmp(atts[i], "valid-zero") == 0) {
+			if (strcmp(atts[i + 1], "true") == 0)
+				valid_zero = true;
+			else
+				fail(&ctx->loc,
+				     "Invalid value for valid-zero: %s",
+				     atts[i + 1]);
+		}
 		if (strcmp(atts[i], "enum") == 0)
 			enumeration_name = atts[i + 1];
 		if (strcmp(atts[i], "bitfield") == 0)
@@ -928,6 +937,9 @@ start_element(void *data, const char *element_name, const char **atts)
 			     "or equal to since version (%u)\n",
 			     version, entry->since);
 		entry->deprecated_since = version;
+
+		if (ctx->enumeration->bitfield && !valid_zero && strcmp(entry->value, "0") == 0)
+			warn(&ctx->loc, "value 0 used in a bitfield entry");
 
 		if (summary)
 			entry->summary = xstrdup(summary);

@@ -25,6 +25,7 @@
   <!ATTLIST entry summary CDATA #IMPLIED>
   <!ATTLIST entry since CDATA #IMPLIED>
   <!ATTLIST entry deprecated-since CDATA #IMPLIED>
+  <!ATTLIST entry valid-zero CDATA #IMPLIED>
 <!ELEMENT arg (description?)>
   <!ATTLIST arg name CDATA #REQUIRED>
   <!ATTLIST arg type CDATA #REQUIRED>
