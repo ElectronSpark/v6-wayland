@@ -231,6 +231,14 @@
       a surface or for many small buffers.
     </description>
 
+    <enum name="error">
+      <description summary="wl_shm_pool error values">
+        These errors can be emitted in response to wl_shm_pool requests.
+      </description>
+      <entry name="invalid_format" value="0" summary="buffer format is not known"/>
+      <entry name="invalid_stride" value="1" summary="invalid size or stride during buffer creation"/>
+    </enum>
+
     <request name="create_buffer">
       <description summary="create a buffer from the pool">
         Create a wl_buffer object from the pool.
@@ -297,8 +305,9 @@
       <description summary="wl_shm error values">
         These errors can be emitted in response to wl_shm requests.
       </description>
+      <!-- invalid_format is no longer used - this enum was being used for wl_shm_pool errors but that interface now has its own error enum. -->
       <entry name="invalid_format" value="0" summary="buffer format is not known"/>
-      <entry name="invalid_stride" value="1" summary="invalid size or stride during pool or buffer creation"/>
+      <entry name="invalid_stride" value="1" summary="invalid size or stride during pool creation"/>
       <entry name="invalid_fd" value="2" summary="mmapping the file descriptor failed"/>
     </enum>
 
