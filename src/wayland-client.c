@@ -2049,14 +2049,34 @@ wl_display_poll(struct wl_display *display,
 
 	pfd[0].fd = display->fd;
 	pfd[0].events = events;
-	do {
-		if (timeout) {
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			timespec_sub_saturate(&result, &deadline, &now);
-			remaining_timeout = &result;
-		}
-		ret = ppoll(pfd, 1, remaining_timeout, NULL);
-	} while (ret == -1 && errno == EINTR);
+	/* xv6 workaround: AF_UNIX poll() can miss readiness edges when the
+	 * peer writes from inside its event-loop callback. Cap the wait at
+	 * 100 ms so we periodically retry recvmsg, which uses MSG_DONTWAIT
+	 * and will drain any data that poll missed. Behaviour for callers
+	 * that pass a finite timeout is unchanged. */
+	{
+		struct timespec xv6_cap = { 0, 100 * 1000 * 1000 };
+		do {
+			if (timeout) {
+				clock_gettime(CLOCK_MONOTONIC, &now);
+				timespec_sub_saturate(&result, &deadline, &now);
+				remaining_timeout = &result;
+				ret = ppoll(pfd, 1, remaining_timeout, NULL);
+			} else {
+				ret = ppoll(pfd, 1, &xv6_cap, NULL);
+				if (ret == 0) {
+					/* Timed out: pretend the fd is ready
+					 * so the caller invokes read_events,
+					 * which uses MSG_DONTWAIT and harmlessly
+					 * returns 0 if nothing is queued.
+					 * This recovers from missed AF_UNIX
+					 * readiness edges. */
+					ret = 1;
+					break;
+				}
+			}
+		} while (ret == -1 && errno == EINTR);
+	}
 
 	return ret;
 }
@@ -2129,6 +2149,17 @@ wl_display_dispatch_queue_timeout(struct wl_display *display,
 	}
 
 	while (true) {
+		ret = wl_display_read_events(display);
+		if (ret == -1)
+			break;
+
+		ret = wl_display_dispatch_queue_pending(display, queue);
+		if (ret != 0)
+			break;
+
+		if (wl_display_prepare_read_queue(display, queue) == -1)
+			return wl_display_dispatch_queue_pending(display, queue);
+
 		if (timeout) {
 			clock_gettime(CLOCK_MONOTONIC, &now);
 			timespec_sub_saturate(&result, &deadline, &now);
