@@ -484,8 +484,12 @@ proxy_create(struct wl_proxy *factory, const struct wl_interface *interface,
 	struct wl_display *display = factory->display;
 
 	proxy = zalloc(sizeof *proxy);
-	if (proxy == NULL)
+	if (proxy == NULL) {
+		fprintf(stderr,
+			"wayland-client: proxy_create failed for %s version=%u errno=%d (%s)\n",
+			interface ? interface->name : "(null)", version, errno, strerror(errno));
 		return NULL;
+	}
 
 	proxy->object.interface = interface;
 	proxy->display = display;
@@ -495,6 +499,9 @@ proxy_create(struct wl_proxy *factory, const struct wl_interface *interface,
 
 	proxy->object.id = wl_map_insert_new(&display->objects, 0, proxy);
 	if (proxy->object.id == 0) {
+		fprintf(stderr,
+			"wayland-client: wl_map_insert_new failed for %s version=%u errno=%d (%s)\n",
+			interface ? interface->name : "(null)", version, errno, strerror(errno));
 		free(proxy);
 		return NULL;
 	}
@@ -917,8 +924,15 @@ wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
 		new_proxy = create_outgoing_proxy(proxy, message,
 						  args, interface,
 						  version);
-		if (new_proxy == NULL)
+		if (new_proxy == NULL) {
+			fprintf(stderr,
+				"wayland-client: create_outgoing_proxy failed for %s.%s new=%s version=%u errno=%d (%s) last_error=%d\n",
+				proxy->object.interface ? proxy->object.interface->name : "(null)",
+				message ? message->name : "(null)",
+				interface ? interface->name : "(null)",
+				version, errno, strerror(errno), proxy->display->last_error);
 			goto err_unlock;
+		}
 	}
 
 	if (proxy->display->last_error) {
