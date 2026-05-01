@@ -251,8 +251,13 @@ handle_array(struct wl_resource *resource, uint32_t opcode,
 
 	log_closure(resource, closure, true);
 
-	if (send_func(closure, resource->client->connection))
+	if (send_func(closure, resource->client->connection)) {
+		wl_log("failed to send event %s#%u.%s to client pid %u errno=%d (%s)\n",
+		       object->interface ? object->interface->name : "(null)",
+		       object->id, object->interface->events[opcode].name,
+		       resource->client->pid, errno, strerror(errno));
 		resource->client->error = true;
+	}
 
 	wl_closure_destroy(closure);
 }
@@ -329,6 +334,11 @@ wl_resource_post_error_vargs(struct wl_resource *resource,
 	 */
 	if (client->error || !client->display_resource)
 		return;
+
+	wl_log("protocol error for client pid %u: %s#%u code=%u: %s\n",
+	       client->pid,
+	       resource->object.interface ? resource->object.interface->name : "(null)",
+	       resource->object.id, code, buffer);
 
 	wl_resource_post_event(client->display_resource,
 			       WL_DISPLAY_ERROR, resource, code, buffer);
