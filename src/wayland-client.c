@@ -49,6 +49,21 @@
 
 /** \cond */
 
+static int
+xv6_wl_trace_enabled(void)
+{
+	static int initialized;
+	static int enabled;
+
+	if (!initialized) {
+		const char *value = getenv("XV6_WAYLAND_TRACE");
+		enabled = value && value[0] && strcmp(value, "0") != 0;
+		initialized = 1;
+	}
+
+	return enabled;
+}
+
 enum wl_proxy_flag {
 	WL_PROXY_FLAG_ID_DELETED = (1 << 0),
 	WL_PROXY_FLAG_DESTROYED = (1 << 1),
@@ -1476,6 +1491,9 @@ wl_display_roundtrip_queue(struct wl_display *display, struct wl_event_queue *qu
 	int done, ret = 0;
 
 	done = 0;
+	if (xv6_wl_trace_enabled())
+		fprintf(stderr, "[WL-CLI] pid=%d roundtrip enter display=%p queue=%p\n",
+			getpid(), (void *) display, (void *) queue);
 
 	display_wrapper = wl_proxy_create_wrapper(display);
 	if (!display_wrapper)
@@ -1489,11 +1507,25 @@ wl_display_roundtrip_queue(struct wl_display *display, struct wl_event_queue *qu
 		return -1;
 
 	wl_callback_add_listener(callback, &sync_listener, &done);
-	while (!done && ret >= 0)
+	if (xv6_wl_trace_enabled())
+		fprintf(stderr, "[WL-CLI] pid=%d roundtrip sync callback=%p\n",
+			getpid(), (void *) callback);
+	while (!done && ret >= 0) {
+		if (xv6_wl_trace_enabled())
+			fprintf(stderr, "[WL-CLI] pid=%d roundtrip dispatch begin done=%d ret=%d\n",
+				getpid(), done, ret);
 		ret = wl_display_dispatch_queue(display, queue);
+		if (xv6_wl_trace_enabled())
+			fprintf(stderr, "[WL-CLI] pid=%d roundtrip dispatch end done=%d ret=%d errno=%d\n",
+				getpid(), done, ret, ret < 0 ? errno : 0);
+	}
 
 	if (ret == -1 && !done)
 		wl_callback_destroy(callback);
+
+	if (xv6_wl_trace_enabled())
+		fprintf(stderr, "[WL-CLI] pid=%d roundtrip leave done=%d ret=%d\n",
+			getpid(), done, ret);
 
 	return ret;
 }
