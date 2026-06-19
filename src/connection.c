@@ -495,13 +495,8 @@ wl_connection_flush(struct wl_connection *connection)
 				      MSG_NOSIGNAL | MSG_DONTWAIT);
 		} while (len == -1 && errno == EINTR);
 
-		if (len == -1) {
-			wl_log("wl_connection_flush: sendmsg failed fd=%d errno=%d (%s) out=%zu fds=%zu clen=%zu\n",
-			       connection->fd, errno, strerror(errno),
-			       ring_buffer_size(&connection->out),
-			       ring_buffer_size(&connection->fds_out), clen);
+		if (len == -1)
 			return -1;
-		}
 
 		close_fds(&connection->fds_out, MAX_FDS_OUT);
 
@@ -579,8 +574,6 @@ wl_connection_write(struct wl_connection *connection,
 		return -1;
 
 	connection->want_flush = 1;
-	if (wl_connection_flush(connection) < 0 && errno != EAGAIN)
-		return -1;
 
 	return 0;
 }

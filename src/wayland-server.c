@@ -60,21 +60,6 @@
 #define LOCK_SUFFIX	".lock"
 #define LOCK_SUFFIXLEN	5
 
-static int
-xv6_wl_trace_enabled(void)
-{
-	static int initialized;
-	static int enabled;
-
-	if (!initialized) {
-		const char *value = getenv("XV6_WAYLAND_TRACE");
-		enabled = value && value[0] && strcmp(value, "0") != 0;
-		initialized = 1;
-	}
-
-	return enabled;
-}
-
 struct wl_socket {
 	int fd;
 	int fd_lock;
@@ -266,13 +251,8 @@ handle_array(struct wl_resource *resource, uint32_t opcode,
 
 	log_closure(resource, closure, true);
 
-	if (send_func(closure, resource->client->connection)) {
-		wl_log("failed to send event %s#%u.%s to client pid %u errno=%d (%s)\n",
-		       object->interface ? object->interface->name : "(null)",
-		       object->id, object->interface->events[opcode].name,
-		       resource->client->pid, errno, strerror(errno));
+	if (send_func(closure, resource->client->connection))
 		resource->client->error = true;
-	}
 
 	wl_closure_destroy(closure);
 }
@@ -350,11 +330,6 @@ wl_resource_post_error_vargs(struct wl_resource *resource,
 	if (client->error || !client->display_resource)
 		return;
 
-	wl_log("protocol error for client pid %u: %s#%u code=%u: %s\n",
-	       client->pid,
-	       resource->object.interface ? resource->object.interface->name : "(null)",
-	       resource->object.id, code, buffer);
-
 	wl_resource_post_event(client->display_resource,
 			       WL_DISPLAY_ERROR, resource, code, buffer);
 	client->error = true;
@@ -401,14 +376,7 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	int opcode, size, since;
 	int len;
 
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-SRV] client-data pid=%u fd=%d mask=0x%x\n",
-			client->pid, fd, mask);
-
 	if (mask & WL_EVENT_HANGUP) {
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr, "[WL-SRV] client-hangup pid=%u fd=%d\n",
-				client->pid, fd);
 		wl_client_destroy(client);
 		return 1;
 	}
@@ -420,10 +388,6 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 
 	if (mask & WL_EVENT_WRITABLE) {
 		len = wl_connection_flush(connection);
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr,
-				"[WL-SRV] client-flush pid=%u fd=%d len=%d errno=%d\n",
-				client->pid, fd, len, len < 0 ? errno : 0);
 		if (len < 0 && errno != EAGAIN) {
 			destroy_client_with_error(
 			    client, "failed to flush client connection");
@@ -437,15 +401,7 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 	len = 0;
 	if (mask & WL_EVENT_READABLE) {
 		len = wl_connection_read(connection);
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr,
-				"[WL-SRV] client-read pid=%u fd=%d len=%d errno=%d\n",
-				client->pid, fd, len, len < 0 ? errno : 0);
-		if (len == 0) {
-			wl_client_destroy(client);
-			return 1;
-		}
-		if (len < 0 && errno != EAGAIN) {
+		if (len == 0 || (len < 0 && errno != EAGAIN)) {
 			destroy_client_with_error(
 			    client, "failed to read client connection");
 			return 1;
@@ -485,18 +441,6 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 		resource = wl_map_lookup(&client->objects, p[0]);
 		resource_flags = wl_map_lookup_flags(&client->objects, p[0]);
 		if (resource == NULL) {
-			if (xv6_wl_trace_enabled()) {
-				uint32_t dump[8] = { 0 };
-				size_t pending = wl_connection_pending_input(connection);
-				wl_connection_copy(connection, dump, sizeof dump);
-				fprintf(stderr,
-					"[WL-SRV] invalid-resource pid=%u len=%d pending=%zu "
-					"p0=%u p1=0x%08x opcode=%d size=%d "
-					"dump=%08x %08x %08x %08x %08x %08x %08x %08x\n",
-					client->pid, len, pending, p[0], p[1], opcode, size,
-					dump[0], dump[1], dump[2], dump[3],
-					dump[4], dump[5], dump[6], dump[7]);
-			}
 			wl_resource_post_error(client->display_resource,
 					       WL_DISPLAY_ERROR_INVALID_OBJECT,
 					       "invalid object %u", p[0]);
@@ -515,11 +459,6 @@ wl_client_connection_data(int fd, uint32_t mask, void *data)
 		}
 
 		message = &object->interface->methods[opcode];
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr,
-				"[WL-SRV] request pid=%u object=%u iface=%s opcode=%d name=%s size=%d\n",
-				client->pid, object->id, object->interface->name,
-				opcode, message->name, size);
 		since = wl_message_get_since(message);
 		if (!(resource_flags & WL_MAP_ENTRY_LEGACY) &&
 		    resource->version > 0 && resource->version < since) {
@@ -647,9 +586,6 @@ wl_client_create(struct wl_display *display, int fd)
 {
 	struct wl_client *client;
 
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-SRV] client-create enter fd=%d\n", fd);
-
 	client = zalloc(sizeof *client);
 	if (client == NULL)
 		return NULL;
@@ -666,11 +602,6 @@ wl_client_create(struct wl_display *display, int fd)
 	if (wl_os_socket_peercred(fd, &client->uid, &client->gid,
 				  &client->pid) != 0)
 		goto err_source;
-
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr,
-			"[WL-SRV] client-create peer fd=%d pid=%u uid=%u gid=%u\n",
-			fd, client->pid, client->uid, client->gid);
 
 	client->connection = wl_connection_create(fd, display->max_buffer_size);
 
@@ -690,10 +621,6 @@ wl_client_create(struct wl_display *display, int fd)
 	wl_list_insert(display->client_list.prev, &client->link);
 
 	wl_priv_signal_emit(&display->create_client_signal, client);
-
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-SRV] client-create ok fd=%d pid=%u\n",
-			fd, client->pid);
 
 	return client;
 
@@ -1910,22 +1837,14 @@ socket_data(int fd, uint32_t mask, void *data)
 	socklen_t length;
 	int client_fd;
 
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-SRV] socket-data listener=%d mask=0x%x\n",
-			fd, mask);
-
 	length = sizeof name;
 	client_fd = wl_os_accept_cloexec(fd, (struct sockaddr *) &name,
 					 &length);
 	if (client_fd < 0)
 		wl_log("failed to accept: %s\n", strerror(errno));
-	else {
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr, "[WL-SRV] accepted listener=%d client_fd=%d\n",
-				fd, client_fd);
+	else
 		if (!wl_client_create(display, client_fd))
 			close(client_fd);
-	}
 
 	return 1;
 }

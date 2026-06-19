@@ -89,17 +89,8 @@ err_free:
 static int
 shm_pool_resize(struct shm_pool *pool, int size)
 {
-	char *copy = NULL;
-
-	if (pool->used > 0) {
-		copy = malloc(pool->used);
-		if (!copy)
-			return 0;
-		memcpy(copy, pool->data, pool->used);
-	}
-
 	if (os_resize_anonymous_file(pool->fd, size) < 0)
-		goto err_copy;
+		return 0;
 
 	wl_shm_pool_resize(pool->pool, size);
 
@@ -108,18 +99,10 @@ shm_pool_resize(struct shm_pool *pool, int size)
 	pool->data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED,
 			  pool->fd, 0);
 	if (pool->data == MAP_FAILED)
-		goto err_copy;
-	if (copy) {
-		memcpy(pool->data, copy, pool->used);
-		free(copy);
-	}
+		return 0;
 	pool->size = size;
 
 	return 1;
-
-err_copy:
-	free(copy);
-	return 0;
 }
 
 static int

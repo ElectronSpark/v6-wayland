@@ -49,21 +49,6 @@
 
 /** \cond */
 
-static int
-xv6_wl_trace_enabled(void)
-{
-	static int initialized;
-	static int enabled;
-
-	if (!initialized) {
-		const char *value = getenv("XV6_WAYLAND_TRACE");
-		enabled = value && value[0] && strcmp(value, "0") != 0;
-		initialized = 1;
-	}
-
-	return enabled;
-}
-
 enum wl_proxy_flag {
 	WL_PROXY_FLAG_ID_DELETED = (1 << 0),
 	WL_PROXY_FLAG_DESTROYED = (1 << 1),
@@ -499,12 +484,8 @@ proxy_create(struct wl_proxy *factory, const struct wl_interface *interface,
 	struct wl_display *display = factory->display;
 
 	proxy = zalloc(sizeof *proxy);
-	if (proxy == NULL) {
-		fprintf(stderr,
-			"wayland-client: proxy_create failed for %s version=%u errno=%d (%s)\n",
-			interface ? interface->name : "(null)", version, errno, strerror(errno));
+	if (proxy == NULL)
 		return NULL;
-	}
 
 	proxy->object.interface = interface;
 	proxy->display = display;
@@ -514,9 +495,6 @@ proxy_create(struct wl_proxy *factory, const struct wl_interface *interface,
 
 	proxy->object.id = wl_map_insert_new(&display->objects, 0, proxy);
 	if (proxy->object.id == 0) {
-		fprintf(stderr,
-			"wayland-client: wl_map_insert_new failed for %s version=%u errno=%d (%s)\n",
-			interface ? interface->name : "(null)", version, errno, strerror(errno));
 		free(proxy);
 		return NULL;
 	}
@@ -939,15 +917,8 @@ wl_proxy_marshal_array_flags(struct wl_proxy *proxy, uint32_t opcode,
 		new_proxy = create_outgoing_proxy(proxy, message,
 						  args, interface,
 						  version);
-		if (new_proxy == NULL) {
-			fprintf(stderr,
-				"wayland-client: create_outgoing_proxy failed for %s.%s new=%s version=%u errno=%d (%s) last_error=%d\n",
-				proxy->object.interface ? proxy->object.interface->name : "(null)",
-				message ? message->name : "(null)",
-				interface ? interface->name : "(null)",
-				version, errno, strerror(errno), proxy->display->last_error);
+		if (new_proxy == NULL)
 			goto err_unlock;
-		}
 	}
 
 	if (proxy->display->last_error) {
@@ -1491,9 +1462,6 @@ wl_display_roundtrip_queue(struct wl_display *display, struct wl_event_queue *qu
 	int done, ret = 0;
 
 	done = 0;
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-CLI] pid=%d roundtrip enter display=%p queue=%p\n",
-			getpid(), (void *) display, (void *) queue);
 
 	display_wrapper = wl_proxy_create_wrapper(display);
 	if (!display_wrapper)
@@ -1507,25 +1475,11 @@ wl_display_roundtrip_queue(struct wl_display *display, struct wl_event_queue *qu
 		return -1;
 
 	wl_callback_add_listener(callback, &sync_listener, &done);
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-CLI] pid=%d roundtrip sync callback=%p\n",
-			getpid(), (void *) callback);
-	while (!done && ret >= 0) {
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr, "[WL-CLI] pid=%d roundtrip dispatch begin done=%d ret=%d\n",
-				getpid(), done, ret);
+	while (!done && ret >= 0)
 		ret = wl_display_dispatch_queue(display, queue);
-		if (xv6_wl_trace_enabled())
-			fprintf(stderr, "[WL-CLI] pid=%d roundtrip dispatch end done=%d ret=%d errno=%d\n",
-				getpid(), done, ret, ret < 0 ? errno : 0);
-	}
 
 	if (ret == -1 && !done)
 		wl_callback_destroy(callback);
-
-	if (xv6_wl_trace_enabled())
-		fprintf(stderr, "[WL-CLI] pid=%d roundtrip leave done=%d ret=%d\n",
-			getpid(), done, ret);
 
 	return ret;
 }
@@ -2095,34 +2049,14 @@ wl_display_poll(struct wl_display *display,
 
 	pfd[0].fd = display->fd;
 	pfd[0].events = events;
-	/* xv6 workaround: AF_UNIX poll() can miss readiness edges when the
-	 * peer writes from inside its event-loop callback. Cap the wait at
-	 * 100 ms so we periodically retry recvmsg, which uses MSG_DONTWAIT
-	 * and will drain any data that poll missed. Behaviour for callers
-	 * that pass a finite timeout is unchanged. */
-	{
-		struct timespec xv6_cap = { 0, 100 * 1000 * 1000 };
-		do {
-			if (timeout) {
-				clock_gettime(CLOCK_MONOTONIC, &now);
-				timespec_sub_saturate(&result, &deadline, &now);
-				remaining_timeout = &result;
-				ret = ppoll(pfd, 1, remaining_timeout, NULL);
-			} else {
-				ret = ppoll(pfd, 1, &xv6_cap, NULL);
-				if (ret == 0) {
-					/* Timed out: pretend the fd is ready
-					 * so the caller invokes read_events,
-					 * which uses MSG_DONTWAIT and harmlessly
-					 * returns 0 if nothing is queued.
-					 * This recovers from missed AF_UNIX
-					 * readiness edges. */
-					ret = 1;
-					break;
-				}
-			}
-		} while (ret == -1 && errno == EINTR);
-	}
+	do {
+		if (timeout) {
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			timespec_sub_saturate(&result, &deadline, &now);
+			remaining_timeout = &result;
+		}
+		ret = ppoll(pfd, 1, remaining_timeout, NULL);
+	} while (ret == -1 && errno == EINTR);
 
 	return ret;
 }
@@ -2195,17 +2129,6 @@ wl_display_dispatch_queue_timeout(struct wl_display *display,
 	}
 
 	while (true) {
-		ret = wl_display_read_events(display);
-		if (ret == -1)
-			break;
-
-		ret = wl_display_dispatch_queue_pending(display, queue);
-		if (ret != 0)
-			break;
-
-		if (wl_display_prepare_read_queue(display, queue) == -1)
-			return wl_display_dispatch_queue_pending(display, queue);
-
 		if (timeout) {
 			clock_gettime(CLOCK_MONOTONIC, &now);
 			timespec_sub_saturate(&result, &deadline, &now);
