@@ -101,6 +101,61 @@ struct wl_shm_sigbus_data {
 	int fallback_mapping_used;
 };
 
+/*
+ * Keep wl_shm server registration independent from process-global protocol
+ * symbol interposition. Imported compositors can bring their own generated
+ * core protocol objects into the same process; if one of those exports an
+ * older wl_shm_interface, wl_display_init_shm() must still advertise the
+ * version implemented by this libwayland-server.
+ */
+static const struct wl_interface *wl_shm_pool_server_create_buffer_types[] = {
+	&wl_buffer_interface,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+	NULL,
+};
+
+static const struct wl_message wl_shm_pool_server_requests[] = {
+	{ "create_buffer", "niiiiu", wl_shm_pool_server_create_buffer_types },
+	{ "destroy", "", NULL },
+	{ "resize", "i", NULL },
+};
+
+static const struct wl_interface wl_shm_pool_server_interface = {
+	"wl_shm_pool",
+	2,
+	3,
+	wl_shm_pool_server_requests,
+	0,
+	NULL,
+};
+
+static const struct wl_interface *wl_shm_server_create_pool_types[] = {
+	&wl_shm_pool_server_interface,
+	NULL,
+	NULL,
+};
+
+static const struct wl_message wl_shm_server_requests[] = {
+	{ "create_pool", "nhi", wl_shm_server_create_pool_types },
+	{ "release", "2", NULL },
+};
+
+static const struct wl_message wl_shm_server_events[] = {
+	{ "format", "u", NULL },
+};
+
+static const struct wl_interface wl_shm_server_interface = {
+	"wl_shm",
+	2,
+	2,
+	wl_shm_server_requests,
+	1,
+	wl_shm_server_events,
+};
+
 static void *
 shm_pool_grow_mapping(struct wl_shm_pool *pool)
 {
@@ -413,7 +468,7 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource,
 
 	version = wl_resource_get_version(resource);
 	pool->resource =
-		wl_resource_create(client, &wl_shm_pool_interface, version, id);
+		wl_resource_create(client, &wl_shm_pool_server_interface, version, id);
 	if (!pool->resource) {
 		wl_client_post_no_memory(client);
 		munmap(pool->data, pool->size);
@@ -453,7 +508,7 @@ bind_shm(struct wl_client *client,
 	struct wl_array *additional_formats;
 	uint32_t *p;
 
-	resource = wl_resource_create(client, &wl_shm_interface, version, id);
+	resource = wl_resource_create(client, &wl_shm_server_interface, version, id);
 	if (!resource) {
 		wl_client_post_no_memory(client);
 		return;
@@ -472,7 +527,8 @@ bind_shm(struct wl_client *client,
 WL_EXPORT int
 wl_display_init_shm(struct wl_display *display)
 {
-	if (!wl_global_create(display, &wl_shm_interface, 2, NULL, bind_shm))
+	if (!wl_global_create(display, &wl_shm_server_interface,
+			      wl_shm_server_interface.version, NULL, bind_shm))
 		return -1;
 
 	return 0;
